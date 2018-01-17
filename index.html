@@ -3,20 +3,40 @@
     <style>
     body{
         background: black;
-        color: white;
-        text-align: center;
+        color: lime;
+        /*text-align: center;*/
         font-size: 2em;
     }
     h1{
         color: orange;
     }
+    button{
+        border: none;
+        color: black;
+        background-color: orange;
+        border-radius: 10px;
+        height: 30px;
+        width: 200px;
+        font-size: 20px;
+    }
+    button:hover{
+        background-color: blue;
+        color: white;
+    }
+    #box{
+        margin-Left: 20%;
+    }
     </style>
     <head>
          <title>Cabbaches</title>
     </head>
-    <h1>hello</h1>
+    <h1>|:::Cabbache:::|</h1>
     <body>
-        <p><font color="green">ello</font></p>
+        <p>Nyan cat experiment</p>
+        <img id="box" src="https://78.media.tumblr.com/ddb6b31434858e534f9c8f2fc8fe9413/tumblr_n00o21AXkc1sbf547o1_400.gif" alt="Image not loaded">
+        <br>
+        <button onClick="move()">Enable physics</button>
+        <p>(Demo)</p>
     </body>
-    
+    <script src="physics.js"></script>
 </html>
