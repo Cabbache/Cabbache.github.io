@@ -29,10 +29,10 @@ function draw() {
 	player.position.x += velx;
 	player.position.y += vely;
 	rot = player.rotation % 360;
-	if (Math.floor(Math.random()*200) == 5){
+	if (Math.floor(Math.random()*150) == 5){
 		var indx = Math.floor(Math.random()*planetImgs.length);
 		var img = planetImgs[indx];
-		planets[planets.length] = [createSprite(width+img.width/2, height*Math.random(), 0, 0),1 + Math.random()*-5, indx];
+		planets[planets.length] = [createSprite(width+img.width/2, height*Math.random(), 0, 0),2 + (Math.random()*-8), indx];
 		planets[planets.length-1][0].addImage(img);
 	}
 	for (k = 0;k < planets.length;k++){
