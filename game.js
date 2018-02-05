@@ -29,18 +29,31 @@ function draw() {
 	player.position.x += velx;
 	player.position.y += vely;
 	rot = player.rotation % 360;
-	if (Math.floor(Math.random()*150) == 5){
+	if (Math.floor(Math.random()*100) == 5){
 		var indx = Math.floor(Math.random()*planetImgs.length);
 		var img = planetImgs[indx];
-		planets[planets.length] = [createSprite(width+img.width/2, height*Math.random(), 0, 0),2 + (Math.random()*-8), indx];
+		planets[planets.length] = [createSprite(width + img.width/2, Math.random()*height, 0, 0),-2.0 + (Math.random()*-4), indx];
 		planets[planets.length-1][0].addImage(img);
+		planets[planets.length-1][0].rotationSpeed = (Math.random()*2)-1;
 	}
 	for (k = 0;k < planets.length;k++){
-		planets[k][0].position.x += planets[k][1];
-		var radius = planetImgs[planets[k][2]].width/2;
-		var distance = Math.sqrt(Math.pow(player.position.x - planets[k][0].position.x, 2) + Math.pow(player.position.y - planets[k][0].position.y, 2));
-		if (distance < radius){
-			alert("crash");
+		if (planets[k][0].position.x > -1*(planetImgs[planets[k][2]].width)){
+			planets[k][0].position.x += planets[k][1];
+			var radius = planetImgs[planets[k][2]].width/2;
+			var distance = Math.sqrt(Math.pow(player.position.x - planets[k][0].position.x, 2) + Math.pow(player.position.y - planets[k][0].position.y, 2));
+			if (distance < radius){
+				alert("crash");
+			}
+			var mass = Math.PI*Math.pow(radius,2);
+			var cons = 10000;
+			var pull = mass/(cons*(distance+radius));
+			var angle = Math.atan((player.position.y - planets[k][0].position.y)/(player.position.x - planets[k][0].position.x));
+			var dir = 1;
+			if (player.position.x > planets[k][0].position.x){
+				dir = -1;
+			}
+			vely += pull*Math.sin(angle)*dir;
+			velx += pull*Math.cos(angle)*dir;
 		}
 	}
 	if (rot > 0){
