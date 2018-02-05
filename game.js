@@ -45,7 +45,7 @@ function draw() {
 				alert("crash");
 			}
 			var mass = Math.PI*Math.pow(radius,2);
-			var cons = 10000;
+			var cons = 5000;
 			var pull = mass/(cons*(distance+radius));
 			var angle = Math.atan((player.position.y - planets[k][0].position.y)/(player.position.x - planets[k][0].position.x));
 			var dir = 1;
