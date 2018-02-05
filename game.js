@@ -32,7 +32,7 @@ function draw() {
 	if (Math.floor(Math.random()*100) == 5){
 		var indx = Math.floor(Math.random()*planetImgs.length);
 		var img = planetImgs[indx];
-		planets[planets.length] = [createSprite(width + img.width/2, Math.random()*height, 0, 0),-2.0 + (Math.random()*-4), indx];
+		planets[planets.length] = [createSprite(width + img.width/2, Math.random()*height, 0, 0),-0.1 + (Math.random()*-4), indx];
 		planets[planets.length-1][0].addImage(img);
 		planets[planets.length-1][0].rotationSpeed = (Math.random()*2)-1;
 	}
