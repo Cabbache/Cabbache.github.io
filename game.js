@@ -56,7 +56,7 @@ function draw() {
 			ammovelx = 0;
 			ammovely = 0;
 		}
-		if (planetcount < difficulty){
+		if (planetcount < Math.floor(difficulty/3.0) || (planetcount < 1 && difficulty != 0)){
 			summonPlanet();	
 		}
 		planetcount = 0;
@@ -69,28 +69,20 @@ function draw() {
 				var radius = planetImgs[planets[k][2]].width/2;
 				var distance = calcDistance(player.position.x, px, player.position.y, py);
 				if (distance < radius){
-					//alert("Nyan cat got hurt. Your score is " + difficulty + "\n\nControls:\nUp arrow: move\nLeft arrow: turn counter-clockwise\nRight arrow: turn clockwise\nSpace: shoot\n\nPlay in full screen [F11]");
 					hit = true;
 				}
 				var distAmmo = calcDistance(ammo.position.x, px, ammo.position.y, py);
 				if (distAmmo < radius && (ammovelx != 0 || ammovely != 0)){
 					planets[k][0].position.x = -1*(planetImgs[planets[k][2]].width) + 10;
 				}
-				var mass = Math.PI*Math.pow(radius,2);
-				var consG = 2500;
-				var pull = mass/(consG*distance);
-				var angle = Math.atan((player.position.y - py)/(player.position.x - px));
-				var dir = 1;
-				if (player.position.x > px){
-					dir = -1;
-				}
-				vely += pull*Math.sin(angle)*dir;
-				velx += pull*Math.cos(angle)*dir;
+				var vect = Weight(radius, player.position.x, player.position.y, px, py);
+				vely += vect[0];
+				velx += vect[1];
 			}
 		}
 		if (player.overlap(food)){
 			difficulty += 1;
-			thrust += 0.05;
+			thrust += 0.01;
 			changeFoodLoc();
 		}
 		if (ammo.overlap(food)){
@@ -124,10 +116,10 @@ function draw() {
 			ammovelx = ammoSpeed*Math.cos((Math.PI*rot)/180.0) + velx;
 			ammovely = -ammoSpeed*Math.sin((Math.PI*rot)/180.0) + vely;
 		}
-		if (player.position.x + playerImage.width/2 > width || player.position.x - playerImage.width/2 < 0){
+		if (velx + player.position.x + playerImage.width/2 > width || player.position.x - playerImage.width/2 < 0){
 			velx *= -1;
 		}
-		if (player.position.y + playerImage.height/2 > height || player.position.y-playerImage.height/2 < 0){
+		if (vely + player.position.y + playerImage.height/2 > height || player.position.y-playerImage.height/2 < 0){
 			vely *= -1;
 		}
 	}
@@ -143,7 +135,7 @@ function motion() {
 function summonPlanet() {
 	var indx = Math.floor(Math.random()*planetImgs.length);
 	var img = planetImgs[indx];
-	planets[planets.length] = [createSprite(width + img.width/2, Math.random()*height, 0, 0),-0.1 + (Math.random()*-4), indx];
+	planets[planets.length] = [createSprite(width + img.width/2, Math.random()*height, 0, 0),-1 + (Math.random()*-3), indx];
 	planets[planets.length-1][0].addImage(img);
 	planets[planets.length-1][0].rotationSpeed = (Math.random()*2)-1;
 }
@@ -153,8 +145,29 @@ function calcDistance(x1, x2, y1, y2){
 }
 
 function changeFoodLoc() {
-	food.position.x = (Math.random()*(width - foodImage.width))+foodImage.width;
-	food.position.y = (Math.random()*(height - foodImage.height))+foodImage.height;
+	var x = (Math.random()*(width - foodImage.width))+foodImage.width;
+	var y = (Math.random()*(height - foodImage.height))+foodImage.height;
+	do{
+		 x = (Math.random()*(width - foodImage.width))+foodImage.width;
+		 y = (Math.random()*(height - foodImage.height))+foodImage.height;	
+	}
+	while (y < player.position.y + playerImage.height && y > player.position.y - playerImage.height && x < player.position.x + playerImage.width && x > player.position.x - playerImage.width);
+	food.position.x = x;
+	food.position.y = y;
+}
+
+function Weight(massRadius, plx, ply, px, py) {
+	var distance = calcDistance(plx, px, ply, py);
+	var mass = Math.PI*Math.pow(massRadius,2);
+	var consG = 2500;
+	var pull = mass/(consG*distance);
+	var angle = Math.atan((ply - py)/(plx - px));
+	var dir = 1;
+	if (player.position.x > px){
+		dir = -1;
+	}
+	var vector = [pull*Math.sin(angle)*dir, pull*Math.cos(angle)*dir];
+	return vector;
 }
 
 function end() {
