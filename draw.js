@@ -6,13 +6,14 @@ var config = {
     storageBucket: "",
     messagingSenderId: "325886448116"
 };
+//var k = 1;
 firebase.initializeApp(config);
 
 var pointsData = firebase.database().ref();
 var points = [];
 
 function setup() {
-  var canvas = createCanvas(400, 400);
+  var canvas = createCanvas(screen.width - 30, screen.height - 30);
   background(255);
   fill(0);
   pointsData.on("child_added", function (point) {
@@ -32,6 +33,9 @@ function draw() {
     var point = points[i];
     ellipse(point.x, point.y, 5, 5);
   }
+  //if keyDown(UP_ARROW){
+  //	alert(points.length);
+ // }
 }
 
 function drawPoint() {
