@@ -37,8 +37,8 @@ function draw() {
 }
 
 function drawPoint() {
-  alert("DON'T TOUCH THE MASTERPIECE! NO COLLABORATION!");
-  //pointsData.push({x: mouseX, y: mouseY});
+  //alert("DON'T TOUCH THE MASTERPIECE! NO COLLABORATION!");
+  pointsData.push({x: mouseX, y: mouseY});
   return false;
 }
 
