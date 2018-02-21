@@ -18,7 +18,7 @@ function setup() {
   pointsData.on("child_added", function (point) {
     points.push(point.val());
   });
-  canvas.mousePressed(drawPoint);
+  //canvas.mousePressed(drawPoint);
   canvas.mouseMoved(function () {
     if (mouseIsPressed) {
       drawPoint();
