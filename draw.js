@@ -6,9 +6,9 @@ var config = {
     storageBucket: "",
     messagingSenderId: "325886448116"
 };
-//var k = 1;
 firebase.initializeApp(config);
 
+var Csize = 5;
 var pointsData = firebase.database().ref();
 var points = [];
 
@@ -19,7 +19,9 @@ function setup() {
   pointsData.on("child_added", function (point) {
     points.push(point.val());
   });
-  //canvas.mousePressed(drawPoint);
+  pointsData.on("child_removed", function () {
+    points = [];
+  });
   canvas.mouseMoved(function () {
     if (mouseIsPressed) {
       drawPoint();
@@ -31,15 +33,18 @@ function draw() {
   background(255);
   for (var i = 0; i < points.length; i++) {
     var point = points[i];
-    ellipse(point.x, point.y, 5, 5);
+    ellipse(point.x, point.y, point.z, point.z);
   }
-  //if keyDown(UP_ARROW){
-  //	alert(points.length);
- // }
+  if (keyDown(UP_ARROW)){
+  	Csize += 1;
+  }
+  if (keyDown(DOWN_ARROW)){
+  	Csize -= 1;
+  }
 }
 
 function drawPoint() {
-  pointsData.push({x: mouseX, y: mouseY});
+  pointsData.push({x: mouseX, y: mouseY, z: Csize});
   return false;
 }
 
