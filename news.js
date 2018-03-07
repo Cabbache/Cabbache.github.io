@@ -16,8 +16,6 @@ function loadWeather() {
   function success(position) {
     var latitude = position.coords.latitude; // latitude using geolocation
     var longitude = position.coords.longitude; // longitude using geolocation
-	alert(longitude);
-	alert(latitude);
 
     // API request:
     $.getJSON(url + apiKey + "/" + latitude + "," + longitude + "?callback=?", function(data) {
@@ -58,7 +56,7 @@ function loadNews() {
   // the text that will be displayed while the function is making the request
   news.text("fetching news...");
 }
-alert("aaa");
+
 loadDate();
 loadWeather();
 loadNews();
