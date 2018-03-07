@@ -11,15 +11,15 @@ function loadDate() {
 function loadWeather() {
   var weather = $("#weather");
   var url = "https://api.forecast.io/forecast/"; // Dark Sky API url
-  var apiKey = "0b327de3dfcc48f79ddf8ca7ffa6c85a"; // API key from Dark Sky
+  var apiKey = "f897f3d5ebc70a9660cbc885d3b25826"; // API key from Dark Sky
 
   function success(position) {
     var latitude = position.coords.latitude; // latitude using geolocation
     var longitude = position.coords.longitude; // longitude using geolocation
-
+	
     // API request:
-    $.getJSON(url + apiKey + "/" + latitude + "," + longitude + "?callback=?", function(data) {
-      weather.text("Based on your current location, it is " + data.currently.temperature + "° F right now");
+    $.getJSON(url + apiKey + "/" + latitude + "," + longitude + "?units=si&callback=?", function(data) {
+      weather.text("Based on your apparent location ("+latitude+","+longitude +") , it is " + data.currently.temperature + "° C right now. The pressure is " + data.currently.pressure + " Pascals. Humidity appears to be " + (data.currently.humidity*100)+"%.");
     });
   }
 
@@ -32,7 +32,7 @@ function loadWeather() {
   navigator.geolocation.getCurrentPosition(success, error);
 
   // the text that will be displayed while the function is making the request
-  weather.text("fetching weather...");
+  weather.text("fetching weather... (need permission for location)");
 }
 
 function loadNews() {
