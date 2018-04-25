@@ -170,22 +170,16 @@ function Weight(massRadius, plx, ply, px, py) {
 	return vector;
 }
 
-function StartEnd(start) {
-	if (!start){
-		background(255,127,0);
-		textAlign(CENTER);
-		textSize(20);
-		fill("black");
-		text("Nyan cat got hurt.", width/2, height/2);
-		textSize(30);
-		text("Your score is " + difficulty, width/2, height/2 + 50);
-		textSize(50);
-		text("Hit enter to restart", width/2, height/2 + 100);
-	}
-	else{
-		textSize(50);
-		text("Hit enter to Start", width/2, height/2 + 100);
-	}
+function end() {
+	background(255,127,0);
+	textAlign(CENTER);
+	textSize(20);
+	fill("black");
+	text("Nyan cat got hurt.", width/2, height/2);
+	textSize(30);
+	text("Your score is " + difficulty, width/2, height/2 + 50);
+	textSize(50);
+	text("Hit enter to restart", width/2, height/2 + 100);
 	textSize(20);
 	text("How to play\nLeft arrow: turn counter-clockwise\nRight arrow: turn clockwise\nUp arrow: move\nSpace: shoot", width/2, height/2 + 150);
 }
