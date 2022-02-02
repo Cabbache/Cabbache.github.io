@@ -41,6 +41,7 @@ const glob_max_mobyellow_health = 100;
 const glob_max_tank_health = 5000;
 const glob_entity_collision_damage = 3;
 var level;
+var glob_lastFrame = 0;
 
 var currentScene = 0; //0: game view, 1: rooms view
 
@@ -521,6 +522,14 @@ function setSceneDied(){
 }
 
 var animate_game=function() {
+	let elasped = Date.now() - glob_lastFrame;
+	console.log(elasped);
+	if (elasped < 25){
+		window.requestAnimationFrame(animate);
+		return;
+	}
+	glob_lastFrame = Date.now();
+
 	let trans = glob_Mat4x4.create();
 
 	let lightNode = scene.findNode("lightNode");
@@ -722,7 +731,6 @@ var animate_game=function() {
 			let projNode = scene.addNode(projectilesNode, projectileModel, params, Node.NODE_TYPE.MODEL)
 			let pRot = glob_Mat4x4.create();
 			glob_Mat4x4.makeRotationZ(pRot, angle);
-			console.log(angle);
 			glob_Mat4x4.makeTranslation(tmp, [posMob[0], posMob[1], 0]);
 			glob_Mat4x4.multiply(projNode.transform, tmp, pRot);
 		}
@@ -767,16 +775,16 @@ var animate_game=function() {
 				return;
 			} else {
 				let currentDist = glob_roverNode.name.flood[hpos][wpos];
-				console.log(currentDist);
-				let test = glob_roverNode.name.flood;
-				let string = "";
-				for (let i = 0;i < test.length;i++){
-					for (let j = 0;j < test[0].length;j++){
-							string += test[i][j] + " ";
-					}
-					string += "\n";
-				}
-				console.log(string);
+//				console.log(currentDist);
+//				let test = glob_roverNode.name.flood;
+//				let string = "";
+//				for (let i = 0;i < test.length;i++){
+//					for (let j = 0;j < test[0].length;j++){
+//							string += test[i][j] + " ";
+//					}
+//					string += "\n";
+//				}
+//				console.log(string);
 				possible = possible.filter(pos => glob_roverNode.name.flood[hpos+pos[1]][wpos+pos[0]] < currentDist && glob_roverNode.name.flood[hpos+pos[1]][wpos+pos[0]] != 0);
 				if (possible.length == 0) //enemy is colliding with tank
 					mobNode.name.heading = [0,0]; //do not move enemy;
