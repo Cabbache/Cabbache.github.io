@@ -154,8 +154,6 @@ Scene.prototype.initialiseShaders = function ()
 
 	this.gl.enable(this.gl.BLEND);
 	this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-	//this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE);
-	//this.gl.disable(this.gl.DEPTH_TEST);
 
 	// Enable the use of shader program
 	this.gl.useProgram(this.shaderProgram);

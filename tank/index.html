@@ -136,7 +136,7 @@
         vec3 ambient = LightFragment[0].ambient * uAmbient;
         vec3 diffuse = LightFragment[0].diffuse * uDiffuse;
         vec3 specular = LightFragment[0].specular * uSpecular;
-        vec3 rho = texture2D(uTexture_0, vTexCoords.xy).xyz;
+        vec4 rho = texture2D(uTexture_0, vTexCoords.xy); //removed .xyz to preserve transparency
         
         // Compute phong specular and lambert diffuse
         float s = pow(max(dot(vReflect, -vEye), 0.0), uShininess) * (uShininess + 2.0) * inv2Pi;
@@ -144,12 +144,21 @@
 
         // KB - Color blending has been changed from modulative to additive 
         //    - Result is saturated to prevent values outside colour valid range
-        //gl_FragColor = vec4(((ambient + d * diffuse + s * specular) * rho * vColor) * attenuation, 1.0);
-        gl_FragColor = vec4(
-          clamp(vColor + ((ambient + diffuse * d + specular * s) * rho * attenuation), vec3(0,0,0), vec3(1,1,1)),
-          1.0
-        );
-				//gl_FragColor = texture2D(uTexture_0, vec2(vTexCoords.s, vTexCoords.t));
+        //gl_FragColor = vec4(((ambient + d * diffuse + s * specular) * rho * vColor) * attenuation, 0.2);
+
+        //gl_FragColor = vec4(
+        //  clamp(vColor + ((ambient + diffuse * d + specular * s) * rho * attenuation), vec3(0,0,0), vec3(1,1,1)),
+        //  1.0
+        //);
+
+        //gl_FragColor = clamp(
+				//	vec4(vColor,0.0) + vec4(ambient + diffuse * d + specular * s, 1.0) * rho * attenuation,
+				//	vec4(0,0,0,0),
+				//	vec4(1,1,1,1)
+				//);
+
+
+        gl_FragColor = vec4(vColor,0.0) + vec4(ambient + diffuse * d + specular * s, 1.0) * rho * attenuation;
       }
     </script>
 
@@ -171,4 +180,4 @@
             style='position: absolute; background-color: black;'>
 	  </canvas>
   </body>
-</html>
+<html>

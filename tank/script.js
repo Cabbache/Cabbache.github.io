@@ -12,6 +12,8 @@ var glob_healthTransformNode; //parent of tank green part health bar
 var glob_redhealthTransformNode; //parent of tank red part health bar
 var glob_healthScaleNode; //tank green part health bar
 
+var rot_inc = 0;
+
 const eightCw = glob_Mat4x4.create();
 const eightCcw = glob_Mat4x4.create();
 glob_Mat4x4.makeRotationZ(eightCw, Math.PI/8);
@@ -30,12 +32,16 @@ var glob_mob_activate_dist = 20; //unit is in tiles
 var glob_AI_lookahead = 20;//this may be cpu intensive
 var glob_mob_firerate = 50; //randInt(0,glob_mob_firerate)
 var glob_trap_damage = 1000;
+const glob_turret_rotation_speed = 8;
 const glob_maxinertia = 0.2;
 const glob_acceleration = 0.002;
 const glob_moveThresh = 0.002;
 const glob_radius = 0.5;
 const glob_healthbar_res = 20;//number of blocks that indicate health
 const tileSize = 0.3;
+const glob_roomsviewoffset = tileSize*width*10;
+const turret_breadth = tileSize;
+const turret_length = 2.285 * turret_breadth;
 const glob_damageblock_size = 0.1 * tileSize;
 const glob_max_mobyellow_health = 100;
 const glob_max_tank_health = 5000;
@@ -46,7 +52,7 @@ var glob_lastFrame = 0;
 var currentScene = 0; //0: game view, 1: rooms view
 
 var scene, light;
-var tmp = glob_Mat4x4.create();;
+var tmp = glob_Mat4x4.create();
 
 var
 glob_tileMaterial,
@@ -116,14 +122,14 @@ const damageQuad = makeQuad(
 );
 
 const enemyQuad = makeQuad(
-	[[-tileSize, -tileSize, -4.99],[tileSize, -tileSize, -4.99],[tileSize, tileSize, -4.99],[-tileSize, tileSize, -4.99]],
+	[[-tileSize, -tileSize, -4.995],[tileSize, -tileSize, -4.995],[tileSize, tileSize, -4.995],[-tileSize, tileSize, -4.995]],
 	[[0,0,1], [0,0,1], [0,0,1], [0,0,1]],
 	[[0.5,0.5,0.5], [0.5,0.5,0.5], [0.5,0.5,0.5], [0.5,0.5,0.5]],
 	[[0,0], [1,0], [1,1], [0,1]]
 );
 
 const turretQuad = makeQuad(
-	[[-tileSize, -tileSize, -4.98],[tileSize*0.1, -tileSize, -4.98],[tileSize*0.1, tileSize*1.5, -4.98],[-tileSize, tileSize*1.5, -4.98]],
+	[[-turret_breadth/2, -turret_length/4, -4.98],[turret_breadth/2, -turret_length/4, -4.98],[turret_breadth/2, turret_length*0.75, -4.98],[-turret_breadth/2, turret_length*0.75, -4.98]],
 	[[0,0,1], [0,0,1], [0,0,1], [0,0,1]],
 	[[0.5,0.5,0.5], [0.5,0.5,0.5], [0.5,0.5,0.5], [0.5,0.5,0.5]],
 	[[0,0], [1,0], [1,1], [0,1]]
@@ -176,12 +182,12 @@ function keyAction(){
 		}else if (keyCode == 37){ // LEFT
 			glob_Mat4x4.to(tmp, glob_turretRotation.transform);
 			let rot = glob_Mat4x4.create();
-			glob_Mat4x4.makeRotationZ(rot, 5*Math.PI/180);
+			glob_Mat4x4.makeRotationZ(rot, glob_turret_rotation_speed*Math.PI/180);
 			glob_Mat4x4.multiply(glob_turretRotation.transform, tmp, rot);
 		}else if (keyCode == 39){ //RIGHT
 			glob_Mat4x4.to(tmp, glob_turretRotation.transform);
 			let rot = glob_Mat4x4.create();
-			glob_Mat4x4.makeRotationZ(rot, -5*Math.PI/180);
+			glob_Mat4x4.makeRotationZ(rot, -glob_turret_rotation_speed*Math.PI/180);
 			glob_Mat4x4.multiply(glob_turretRotation.transform, tmp, rot);
 		} else if (keyCode == 65){ //A
 			glob_Mat4x4.to(tmp, glob_roverNode.transform);
@@ -207,96 +213,42 @@ function keyAction(){
 			keyState[keyCode] = false;
 			if (currentScene == 0){
 				currentScene = 1;
-				setSceneRooms(level);
+				glob_Vec3.to(observer, [glob_roomsviewoffset + 3*5/2, glob_roomsviewoffset + 3*3/2, 25]);
+				observer[2] = 18;
+				scene.lookAt(observer, [glob_roomsviewoffset + 3*5/2,glob_roomsviewoffset + 3*3/2,0], [0,1,0]);
 			}else if (currentScene == 1){
 				currentScene = 0;
-				setSceneGame(level);
 			}
 		}
 	}
 }
 
 function setSceneRooms(level){
-  scene = new Scene();
-  scene.initialise(glob_gl, glob_canvas);
+  //scene = new Scene();
+  //scene.initialise(glob_gl, glob_canvas);
 
-  light = new Light();
-  light.type = Light.LIGHT_TYPE.POINT;
-  light.setDiffuse([2, 2, 2]);
-  light.setSpecular([0, 0, 0]);
-  light.setAmbient([0.2, 0.2, 0.2]);
-  light.setPosition([0, 0, 2.5]);
-  light.setDirection([0, 0, -1]);
-  light.setCone(0.7, 0.6);
-  light.attenuation = Light.ATTENUATION_TYPE.NONE;
-  light.bind(glob_gl, scene.shaderProgram, 0);
+  //light = new Light();
+  //light.type = Light.LIGHT_TYPE.POINT;
+  //light.setDiffuse([2, 2, 2]);
+  //light.setSpecular([0, 0, 0]);
+  //light.setAmbient([0.2, 0.2, 0.2]);
+  //light.setPosition([0, 0, 2.5]);
+  //light.setDirection([0, 0, -1]);
+  //light.setCone(0.7, 0.6);
+  //light.attenuation = Light.ATTENUATION_TYPE.NONE;
+  //light.bind(glob_gl, scene.shaderProgram, 0);
 
-  bridge_material = make_material(glob_gl, scene.shaderProgram, textureList.bridge);
-	offRoomMaterial = make_material(glob_gl, scene.shaderProgram, textureList.bridge);
-	exitMaterial = make_material(glob_gl, scene.shaderProgram, textureList.exitSign);
 
-  let lightNode = scene.addNode(scene.root, light, "lightNode", Node.NODE_TYPE.LIGHT);
-	let roomsNode = scene.addNode(lightNode, null, "rooms", Node.NODE_TYPE.GROUP);
-	let bridgesNode = scene.addNode(lightNode, null, "bridges", Node.NODE_TYPE.GROUP);
-	let horizontalBridges = scene.addNode(bridgesNode, null, "horizontalBridges", Node.NODE_TYPE.GROUP);
-	let verticalBridges = scene.addNode(bridgesNode, null, "verticalBridges", Node.NODE_TYPE.GROUP);
 
-	glob_Mat4x4.makeScalingUniform(bridgesNode.transform, 0.2);
-	glob_Mat4x4.makeRotationZ(verticalBridges.transform, Math.PI/2);
+  //let ang = 0;
 
-	let exitModel = new Model();
-	exitModel.name = "exitSign";
-	exitModel.index = exitQuad.index;
-	exitModel.vertex = exitQuad.vertex;
-	exitModel.compile(scene)
-	exitModel.material = exitMaterial;
+  //let viewTransform = glob_Mat4x4.create(); 
+  //observer = glob_Vec3.from(0,0,25);
 
-	for (let i = 0;i < 16;i++){
-		let x = parseInt(i / 4);
-		let y = i % 4;
-		let doors = getDoors(level, [x, y]);
-		let roomModel = new Model();
-		roomModel.name = "room" + i;
-		roomModel.index = roomQuad.index;
-		roomModel.vertex = roomQuad.vertex;
-		roomModel.compile(scene)
-		if (doors)
-			roomModel.material = bridge_material;
-		else
-			roomModel.material = offRoomMaterial;
-		let roomNode = scene.addNode(roomsNode, roomModel, "roomNode"+i, Node.NODE_TYPE.MODEL);
-		if (x == level.end[0] && y == level.end[1]){
-			scene.addNode(roomNode, exitModel, "exitSign", Node.NODE_TYPE.MODEL);
-		}
+  //glob_Mat4x4.makeIdentity(viewTransform);
 
-		glob_Mat4x4.makeTranslation(roomNode.transform, [x*5 - 7.5, y*2.8 - 4.3, 0]);
-		for (let d = 0;d <= 2;d+=2){//d = 0: RIGHT, d = 2: UP
-			if ((doors >> d & 1) == 0)
-				continue;
-			let bridgeModel = new Model();
-			bridgeModel.name = "bridge_"+i+"_"+d;
-			bridgeModel.index = roomQuad.index;
-			bridgeModel.vertex = roomQuad.vertex;
-			bridgeModel.compile(scene)
-			bridgeModel.material = bridge_material;
-			let bridgeNode = scene.addNode(d == 0 ? horizontalBridges:verticalBridges, bridgeModel, bridgeModel.name, Node.NODE_TYPE.MODEL);
-			if (d == 0){
-				glob_Mat4x4.makeTranslation(bridgeNode.transform, [x*4 - 4, y*2.2 - 3.3, 0]);
-			} else {
-				glob_Mat4x4.makeTranslation(bridgeNode.transform, [x*4 - 6, y*2.2 - 2.3, 0]);
-			}
-		}
-	}
-
-  let ang = 0;
-
-  let viewTransform = glob_Mat4x4.create(); 
-  observer = glob_Vec3.from(0,0,25);
-
-  glob_Mat4x4.makeIdentity(viewTransform);
-
-  scene.setViewFrustum(1, 100, 0.5236);
-	animate = animate_roomsview;
+  //scene.setViewFrustum(1, 100, 0.5236);
+	//animate = animate_roomsview;
 }
 
 function setSceneGame(level, starting_door){
@@ -314,6 +266,12 @@ function setSceneGame(level, starting_door){
   light.attenuation = Light.ATTENUATION_TYPE.NONE;
   light.bind(glob_gl, scene.shaderProgram, 0);
 
+
+
+  bridge_material = make_material(glob_gl, scene.shaderProgram, textureList.bridge);
+	offRoomMaterial = make_material(glob_gl, scene.shaderProgram, textureList.bridge);
+	exitMaterial = make_material(glob_gl, scene.shaderProgram, textureList.exitSign);
+
   glob_tileMaterial = make_material(glob_gl, scene.shaderProgram, textureList.cobble);
 	glob_roverMaterial = make_material(glob_gl, scene.shaderProgram, textureList.rover);
 	glob_turretMaterial = make_material(glob_gl, scene.shaderProgram, textureList.turret);
@@ -328,6 +286,20 @@ function setSceneGame(level, starting_door){
 	glob_upgrade_concurrentMaterial  = make_material(glob_gl, scene.shaderProgram, textureList.concurrent);
 	glob_upgrade_damageMaterial = make_material(glob_gl, scene.shaderProgram, textureList.damage);
 	glob_upgrade_bounceMaterial  = make_material(glob_gl, scene.shaderProgram, textureList.bounce);
+
+	let exitModel = new Model();
+	exitModel.name = "exitSign";
+	exitModel.index = exitQuad.index;
+	exitModel.vertex = exitQuad.vertex;
+	exitModel.compile(scene)
+	exitModel.material = exitMaterial;
+
+	let currentModel = new Model();
+	currentModel.name = "current";
+	currentModel.index = exitQuad.index;
+	currentModel.vertex = exitQuad.vertex;
+	currentModel.compile(scene)
+	currentModel.material = glob_roverMaterial;
 
 	let roverModel = new Model();
 	roverModel.name = "rover";
@@ -369,12 +341,20 @@ function setSceneGame(level, starting_door){
 	}
 
   let lightNode = scene.addNode(scene.root, light, "lightNode", Node.NODE_TYPE.LIGHT);
-	if (glob_roverNode == undefined)
-		glob_roverNode = scene.addNode(lightNode, roverModel, {health: glob_max_tank_health, ipos: [0,0], flood:null}, Node.NODE_TYPE.MODEL);
-	else
-		glob_roverNode = scene.addNode(lightNode, roverModel, glob_roverNode.name, Node.NODE_TYPE.MODEL);
 
-	glob_turretRotation = scene.addNode(lightNode, null, "turretRot", Node.NODE_TYPE.GROUP);
+	let roomsNode = scene.addNode(lightNode, null, "rooms", Node.NODE_TYPE.GROUP);
+	let bridgesNode = scene.addNode(lightNode, null, "bridges", Node.NODE_TYPE.GROUP);
+	let horizontalBridges = scene.addNode(bridgesNode, null, "horizontalBridges", Node.NODE_TYPE.GROUP);
+	let verticalBridges = scene.addNode(bridgesNode, null, "verticalBridges", Node.NODE_TYPE.GROUP);
+	glob_Mat4x4.makeScaling(bridgesNode.transform, [0.3, 0.3, 1]);
+	glob_Mat4x4.makeRotationZ(verticalBridges.transform, Math.PI/2);
+
+	if (glob_roverNode == undefined)
+		glob_roverNode = scene.addNode(scene.root, roverModel, {health: glob_max_tank_health, ipos: [0,0], flood:null}, Node.NODE_TYPE.MODEL);
+	else
+		glob_roverNode = scene.addNode(scene.root, roverModel, glob_roverNode.name, Node.NODE_TYPE.MODEL);
+
+	glob_turretRotation = scene.addNode(scene.root, null, "turretRot", Node.NODE_TYPE.GROUP);
 	let roomStatic = scene.addNode(lightNode, null, "staticElements", Node.NODE_TYPE.GROUP);
 	let mobs = scene.addNode(lightNode, null, "mobs", Node.NODE_TYPE.GROUP);
 	let projectilesNode = scene.addNode(lightNode, null, "projectiles", Node.NODE_TYPE.GROUP);
@@ -410,6 +390,7 @@ function setSceneGame(level, starting_door){
 	turretNode.transform = healthNode.transform = redHealthNode.transform = glob_roverNode.transform;//assigns the reference, this is very important
 	
 	let tiles = level.rooms[level.currentRoom[0]][level.currentRoom[1]];
+	//loop on tiles to build game scene
 	for (let i = 0;i < tiles.length;i++){
 		let row = tiles[i];
 		for (let j = 0;j < row.length;j++){
@@ -505,6 +486,46 @@ function setSceneGame(level, starting_door){
 			}
 		}
 	}
+	
+	//loop to make rooms view
+	for (let i = 0;i < 16;i++){
+		let x = parseInt(i / 4);
+		let y = i % 4;
+		let doors = getDoors(level, [x, y]);
+		let roomModel = new Model();
+		roomModel.name = "room" + i;
+		roomModel.index = roomQuad.index;
+		roomModel.vertex = roomQuad.vertex;
+		roomModel.compile(scene)
+		if (doors)
+			roomModel.material = bridge_material;
+		else
+			roomModel.material = offRoomMaterial;
+		let roomNode = scene.addNode(roomsNode, roomModel, "roomNode"+i, Node.NODE_TYPE.MODEL);
+		if (x == level.end[0] && y == level.end[1]){
+			scene.addNode(roomNode, exitModel, "exitSign", Node.NODE_TYPE.MODEL);
+		} else if (x == level.currentRoom[0] && y == level.currentRoom[1]){
+			scene.addNode(roomNode, currentModel, "current", Node.NODE_TYPE.MODEL);
+		}
+
+		glob_Mat4x4.makeTranslation(roomNode.transform, [glob_roomsviewoffset + x*5, glob_roomsviewoffset + y*3, 0]);
+		for (let d = 0;d <= 2;d+=2){//d = 0: RIGHT, d = 2: UP
+			if ((doors >> d & 1) == 0)
+				continue;
+			let bridgeModel = new Model();
+			bridgeModel.name = "bridge_"+i+"_"+d;
+			bridgeModel.index = roomQuad.index;
+			bridgeModel.vertex = roomQuad.vertex;
+			bridgeModel.compile(scene)
+			bridgeModel.material = bridge_material;
+			let bridgeNode = scene.addNode(d == 0 ? horizontalBridges:verticalBridges, bridgeModel, bridgeModel.name, Node.NODE_TYPE.MODEL);
+			if (d == 0){
+				glob_Mat4x4.makeTranslation(bridgeNode.transform, [glob_roomsviewoffset + x*5+2.5, glob_roomsviewoffset + y*3, 0]);
+			} else {
+				glob_Mat4x4.makeTranslation(bridgeNode.transform, [glob_roomsviewoffset + x*5, glob_roomsviewoffset + y*3+1.5, 0]);
+			}
+		}
+	}
 
   let viewTransform = glob_Mat4x4.create(); 
 
@@ -555,7 +576,7 @@ var animate_game=function() {
 		let dist = pythagoras(posTank, posObj);
 		if (dist < glob_radius){
 			if (childNode.name == "wall" || childNode.nodeObject.material == glob_doorclosedMaterial){
-				glob_Mat4x4.makeTranslation(trans, [0,-1.2*glob_inertia,0]); //move tank back by inertia
+				glob_Mat4x4.makeTranslation(trans, [0,-glob_inertia,0]); //move tank back by inertia
 				glob_Mat4x4.to(tmp, glob_roverNode.transform);
 				glob_Mat4x4.multiply(glob_roverNode.transform, tmp, trans);
 				glob_inertia = 0.6*-glob_inertia; //0.6 is wall bounciness
@@ -797,9 +818,10 @@ var animate_game=function() {
 	//glob_Mat4x4.multiplyPoint(observer, viewTransform, [posTank[0],posTank[1],18]);  // apply camera rotation
 
 	//move camera with player
-	glob_Vec3.to(observer, posTank);
-	observer[2] = 15;
-	scene.lookAt(observer, [posTank[0],posTank[1],0], [0,1,0]);
+	if (currentScene == 0){
+		glob_Vec3.to(observer, [posTank[0], posTank[1], 12]);
+		scene.lookAt(observer, [posTank[0],posTank[1],0], [0,1,0]);
+	}
 
 	scene.beginFrame();
 	scene.animate();
@@ -824,6 +846,26 @@ var animate_roomsview = function() {
 	window.requestAnimationFrame(animate);
 };
 
+function updateMobHealth(mobNode, mobsNode){
+	if (mobNode.name.health <= 0){
+		mobsNode.children.splice(mobsNode.children.indexOf(mobNode), 1);
+		return;
+	}
+	let scale_green = Math.round(20 * mobNode.name.health / glob_max_mobyellow_health);
+	glob_Mat4x4.makeScaling(mobNode.children[2].transform, [scale_green, 2.5, 0.999]);
+}
+
+function updateTankHealth(){
+	if (glob_roverNode.name.health <= 0){
+		setSceneDied();
+	}
+	glob_Mat4x4.makeScaling(glob_healthScaleNode.transform, [20*glob_roverNode.name.health/glob_max_tank_health,2.5,0.95]);
+}
+
+function world_to_index(world){
+	return [Math.round(world[1] / (2*tileSize)) + height/2, Math.round(world[0] / (2*tileSize)) + width/2];
+}
+
 let main=function() 
 {
 	glob_canvas = document.getElementById("canvas-cg-lab");
@@ -845,23 +887,3 @@ let main=function()
 
 	animate();
 };
-
-function updateMobHealth(mobNode, mobsNode){
-	if (mobNode.name.health <= 0){
-		mobsNode.children.splice(mobsNode.children.indexOf(mobNode), 1);
-		return;
-	}
-	let scale_green = Math.round(20 * mobNode.name.health / glob_max_mobyellow_health);
-	glob_Mat4x4.makeScaling(mobNode.children[2].transform, [scale_green, 2.5, 0.999]);
-}
-
-function updateTankHealth(){
-	if (glob_roverNode.name.health <= 0){
-		setSceneDied();
-	}
-	glob_Mat4x4.makeScaling(glob_healthScaleNode.transform, [20*glob_roverNode.name.health/glob_max_tank_health,2.5,0.95]);
-}
-
-function world_to_index(world){
-	return [Math.round(world[1] / (2*tileSize)) + height/2, Math.round(world[0] / (2*tileSize)) + width/2];
-}
