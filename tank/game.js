@@ -37,7 +37,6 @@ function num_doors(level){
 //room must be a neighbour of level.start
 //assumes player is at level.start
 function step(level, room){
-	//TODO test if room is a neighbour?
 	let copy = {...level};
 	if (copy.start[1]) copy.connections &= ~(1 << (12 + copy.start[0]*3 + copy.start[1] - 1 + 1) - 1);
 	if (copy.start[1] != 3) copy.connections &= ~(1 << (12 + copy.start[0]*3 + copy.start[1] + 1) - 1);
@@ -58,7 +57,7 @@ function getNeighbours(level, room){
 	return neighbours.map(x => [x[0]+room[0], x[1]+room[1]]);
 }
 
-function genValidLevel(){
+function genValidLevel(difficulty=1){
 	function genLevel(){
 		let start = [0,0];
 		let end = [0,0];
@@ -94,28 +93,13 @@ function genValidLevel(){
 	}
 
 	let level;
-	while (!isValid(level = genLevel(), randInt(3, 10)));//number of rooms between start,end is randint(3,10)
+	while (!isValid(level = genLevel(), Math.min(2+randInt(difficulty, difficulty+3), 14)));
 
 	for (let i = 0;i < 4;i++)
 	for (let j = 0;j < 4;j++)
 		level.rooms[i][j] = buildRoom(level, [i, j]);
 	
 	return level;
-}
-
-function makeNormal(maxHeight, width, fill, roughness){
-	tally={}
-	for (let j = 0;j < maxHeight*width*fill;j++){
-		let sum = 0;
-		for (let i = 0;i < width/roughness;i++)
-			sum += randInt(0, roughness);
-		if (tally[sum] == undefined)
-			tally[sum] = 1;
-		else if (tally[sum] < maxHeight)
-			tally[sum]++;
-	}
-
-	return tally;
 }
 
 //returns length of shortest path, doors and tiles are not obstacles
@@ -240,7 +224,7 @@ function allDoorsHavePath(tiles){
 	3 - tnt
 	4 - oil
 */
-function buildRoom(level, room){
+function buildRoom(level, room, difficulty=1){
 	let doors = getDoors(level, room);
 	let tiles = [];
 	/*
@@ -272,52 +256,33 @@ left[1,0,0,0,0,1] H right
 		if (doors >> 3 & 1) { //if theres a down door
 			let door_pos = randInt(width*0.1, width*0.9);
 			if (level.rooms[room[0]][room[1]-1] != undefined)
-				door_pos = level.rooms[room[0]][room[1]-1][height-1].indexOf(2); //to make door in same place as connecting room
+				door_pos = level.rooms[room[0]][room[1]-1].tiles[height-1].indexOf(2); //to make door in same place as connecting room
 			tiles[0][door_pos] = 2;
 		} if (doors >> 2 & 1) { //if theres an up door
 			let door_pos = randInt(width*0.1, width*0.9);
 			if (level.rooms[room[0]][room[1]+1] != undefined)
-				door_pos = level.rooms[room[0]][room[1]+1][0].indexOf(2);
+				door_pos = level.rooms[room[0]][room[1]+1].tiles[0].indexOf(2);
 			tiles[height-1][door_pos] = 2;
 		} if (doors >> 1 & 1) { //if theres a left door
 			let door_pos = randInt(height*0.1, height*0.9);
 			if (level.rooms[room[0]-1][room[1]] != undefined)
-				door_pos = level.rooms[room[0]-1][room[1]].map(row => row[row.length-1]).indexOf(2);
+				door_pos = level.rooms[room[0]-1][room[1]].tiles.map(row => row[row.length-1]).indexOf(2);
 			tiles[door_pos][0] = 2;
 		} if (doors >> 0 & 1) { //if theres a right door
 			let door_pos = randInt(height*0.1, height*0.9);
 			if (level.rooms[room[0]+1][room[1]] != undefined)
-				door_pos = level.rooms[room[0]+1][room[1]].map(row => row[0]).indexOf(2);
+				door_pos = level.rooms[room[0]+1][room[1]].tiles.map(row => row[0]).indexOf(2);
 			tiles[door_pos][width-1] = 2;
 		}
 
-	//	let segment = 0;
-	//	let randSize=randInt(7,10);
-	//	while (segment + randSize < width){
-	//		//TODO check if door lies between segment and segment + randSize
-	//
-	//		//create a normal distribution
-	//		let tally = makeNormal(height/4, randSize, randInt(3,10)/10, randInt(2, 4));
-	//		//let tally = makeNormal(height/4, randSize, 0.1, randInt(2, 6));
-	//
-	//		for (let i = 0;i < randSize;i++){
-	//			if (tiles[0][i+segment] == 2)
-	//				break;
-	//			for (let j = 0;j < tally[i];j++){
-	//				tiles[j+1][i+segment] = 1;
-	//			}
-	//		}
-	//		
-	//		segment += randSize;
-	//		randSize = randInt(7,10);
-	//	}
-
+		//place a few blocks randomly
 		for (let i = 0;i < 20;i++){
 			let h1 = randInt(1,height-2);
 			let w1 = randInt(1,width-2);
 			tiles[h1][w1] = 1;
 		}
 
+		//grow the blocks placed randomly
 		while (perc_covered(tiles) < 0.4){
 			let i = randInt(2,height-3);
 			let j = randInt(2,width-3);
@@ -332,7 +297,8 @@ left[1,0,0,0,0,1] H right
 				tiles[pos[0]][pos[1]] = 1;
 		}
 
-		for (let i=0;i<200;i++){
+		//place traps at corners
+		for (let i=0;i<200+(difficulty*5);i++){
 			let h1 = randInt(1,height-2);
 			let w1 = randInt(1,width-2);
 			if (tiles[h1][w1]) continue; //skip occupied
@@ -351,17 +317,20 @@ left[1,0,0,0,0,1] H right
 			}
 		}
 
-		for (let i = 0;i < 30;i++){
+		//place traps and powerups on random tiles, not necesarily in corners
+		for (let i = 0;i < 30+(difficulty*2);i++){
 			let h1 = randInt(1,height-2);
 			let w1 = randInt(1,width-2);
 			if (tiles[h1][w1]) continue;
-			if (randInt(0,40) == 0)
+			if (randInt(0,30+(difficulty*2)) == 0)
 				tiles[h1][w1] = randInt(5,7);//powerups
 			else
 				tiles[h1][w1] = randInt(3,4);//traps
 		}
 	}
-	
 
-	return tiles;
+	return {
+		tiles: tiles,
+		num_enemies: randInt(difficulty, difficulty+2)*5
+	};
 }

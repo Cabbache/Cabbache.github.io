@@ -1,6 +1,7 @@
 'use strict';
 
 var glob_canvas, glob_gl;
+var glob_level_difficulty = 1;
 var animate;
 
 const glob_Mat4x4 = matrixHelper.matrix4;
@@ -12,7 +13,9 @@ var glob_healthTransformNode; //parent of tank green part health bar
 var glob_redhealthTransformNode; //parent of tank red part health bar
 var glob_healthScaleNode; //tank green part health bar
 
-var rot_inc = 0;
+var glob_enemy_spawnpoints = [];
+
+var glob_wave_over = false;
 
 const eightCw = glob_Mat4x4.create();
 const eightCcw = glob_Mat4x4.create();
@@ -32,6 +35,8 @@ var glob_mob_activate_dist = 20; //unit is in tiles
 var glob_AI_lookahead = 20;//this may be cpu intensive
 var glob_mob_firerate = 50; //randInt(0,glob_mob_firerate)
 var glob_trap_damage = 1000;
+var glob_spawnrate = 50;
+
 const glob_turret_rotation_speed = 8;
 const glob_maxinertia = 0.2;
 const glob_acceleration = 0.002;
@@ -135,8 +140,8 @@ const turretQuad = makeQuad(
 	[[0,0], [1,0], [1,1], [0,1]]
 );
 
-const doorQuad = makeQuad(
-	[[-1.5*tileSize, -tileSize, -5],[1.5*tileSize, -tileSize, -5],[1.5*tileSize, tileSize, -5],[-1.5*tileSize, tileSize, -5]],
+const doorCoverQuad = makeQuad(
+	[[-1.5*tileSize, -tileSize, -4.97],[1.5*tileSize, -tileSize, -4.97],[1.5*tileSize, tileSize, -4.97],[-1.5*tileSize, tileSize, -4.97]],
 	[[0,0,1], [0,0,1], [0,0,1], [0,0,1]],
 	[[0.5,0.5,0.5], [0.5,0.5,0.5], [0.5,0.5,0.5], [0.5,0.5,0.5]],
 	[[0,0], [1,0], [1,1], [0,1]]	
@@ -155,29 +160,39 @@ function keyAction(){
 	for (let i = 0;i < keys.length;i++){
 		let keyCode = keys[i];
 		if (!keyState[keyCode]) continue;
+		if (keyCode == 27){ //Escape
+			keyState[keyCode] = false;
+			if (currentScene == 0){
+				currentScene = 1;
+				glob_Vec3.to(observer, [glob_roomsviewoffset + 3*5/2, glob_roomsviewoffset + 3*3/2, 25]);
+				observer[2] = 18;
+				scene.lookAt(observer, [glob_roomsviewoffset + 3*5/2,glob_roomsviewoffset + 3*3/2,0], [0,1,0]);
+			}else if (currentScene == 1){
+				currentScene = 0;
+			}
+		}
+		if (currentScene == 1) continue;
 		if (keyCode == 32){
 			//add projectile node to current scene.
-			if (currentScene == 0){
-				let projectilesNode = scene.findNode("projectiles");
-				if (projectilesNode.children.filter(x => x.nodeObject.name == "projectile").length >= glob_max_projectiles)
-					continue;
+			let projectilesNode = scene.findNode("projectiles");
+			if (projectilesNode.children.filter(x => x.nodeObject.name == "projectile").length >= glob_max_projectiles)
+				continue;
 
-				let projectileMaterial = make_material(glob_gl, scene.shaderProgram, textureList.projectile);
-				let projectileModel = new Model();
-				projectileModel.name = "projectile";
-				projectileModel.index = projectileQuad.index;
-				projectileModel.vertex = projectileQuad.vertex;
-				projectileModel.compile(scene)
-				projectileModel.material = projectileMaterial;
+			let projectileMaterial = make_material(glob_gl, scene.shaderProgram, textureList.projectile);
+			let projectileModel = new Model();
+			projectileModel.name = "projectile";
+			projectileModel.index = projectileQuad.index;
+			projectileModel.vertex = projectileQuad.vertex;
+			projectileModel.compile(scene)
+			projectileModel.material = projectileMaterial;
 
-				let params = {
-					bounces: 0,
-					damage: glob_tank_projectile_damage
-				};
+			let params = {
+				bounces: 0,
+				damage: glob_tank_projectile_damage
+			};
 
-				let projNode = scene.addNode(projectilesNode, projectileModel, params, Node.NODE_TYPE.MODEL)
-				glob_Mat4x4.multiply(projNode.transform, glob_roverNode.transform, glob_turretRotation.transform);
-			}
+			let projNode = scene.addNode(projectilesNode, projectileModel, params, Node.NODE_TYPE.MODEL)
+			glob_Mat4x4.multiply(projNode.transform, glob_roverNode.transform, glob_turretRotation.transform);
 			keyState[keyCode] = false;
 		}else if (keyCode == 37){ // LEFT
 			glob_Mat4x4.to(tmp, glob_turretRotation.transform);
@@ -209,49 +224,29 @@ function keyAction(){
 			glob_inertia = Math.min(glob_maxinertia, glob_inertia + 10*glob_acceleration);
 		} else if (keyCode == 83){ //S
 			glob_inertia = Math.max(-glob_maxinertia, glob_inertia - 10*glob_acceleration);
-		} else if (keyCode == 27){ //Escape
-			keyState[keyCode] = false;
-			if (currentScene == 0){
-				currentScene = 1;
-				glob_Vec3.to(observer, [glob_roomsviewoffset + 3*5/2, glob_roomsviewoffset + 3*3/2, 25]);
-				observer[2] = 18;
-				scene.lookAt(observer, [glob_roomsviewoffset + 3*5/2,glob_roomsviewoffset + 3*3/2,0], [0,1,0]);
-			}else if (currentScene == 1){
-				currentScene = 0;
-			}
 		}
 	}
 }
 
-function setSceneRooms(level){
-  //scene = new Scene();
-  //scene.initialise(glob_gl, glob_canvas);
+function setSceneGame(starting_door){
+	if (level.currentRoom[0] == level.end[0] && level.currentRoom[1] == level.end[1]){
+		console.log("end reached");
+		level = genValidLevel(++glob_level_difficulty);
 
-  //light = new Light();
-  //light.type = Light.LIGHT_TYPE.POINT;
-  //light.setDiffuse([2, 2, 2]);
-  //light.setSpecular([0, 0, 0]);
-  //light.setAmbient([0.2, 0.2, 0.2]);
-  //light.setPosition([0, 0, 2.5]);
-  //light.setDirection([0, 0, -1]);
-  //light.setCone(0.7, 0.6);
-  //light.attenuation = Light.ATTENUATION_TYPE.NONE;
-  //light.bind(glob_gl, scene.shaderProgram, 0);
+		//increase difficulty
+		glob_mob_firerate -= 1;//this actually increases firerate
+		glob_spawnrate -= 2;
+		glob_mobspeed += 0.005;
 
+		//start from room center
+		starting_door = undefined;
 
+		//reset health
+		glob_redhealthTransformNode = undefined;
+		glob_healthTransformNode = undefined;
+		glob_roverNode = undefined;
+	}
 
-  //let ang = 0;
-
-  //let viewTransform = glob_Mat4x4.create(); 
-  //observer = glob_Vec3.from(0,0,25);
-
-  //glob_Mat4x4.makeIdentity(viewTransform);
-
-  //scene.setViewFrustum(1, 100, 0.5236);
-	//animate = animate_roomsview;
-}
-
-function setSceneGame(level, starting_door){
   scene = new Scene();
   scene.initialise(glob_gl, glob_canvas);
 
@@ -265,8 +260,6 @@ function setSceneGame(level, starting_door){
   light.setCone(0.7, 0.6);
   light.attenuation = Light.ATTENUATION_TYPE.NONE;
   light.bind(glob_gl, scene.shaderProgram, 0);
-
-
 
   bridge_material = make_material(glob_gl, scene.shaderProgram, textureList.bridge);
 	offRoomMaterial = make_material(glob_gl, scene.shaderProgram, textureList.bridge);
@@ -389,7 +382,8 @@ function setSceneGame(level, starting_door){
 
 	turretNode.transform = healthNode.transform = redHealthNode.transform = glob_roverNode.transform;//assigns the reference, this is very important
 	
-	let tiles = level.rooms[level.currentRoom[0]][level.currentRoom[1]];
+	let tiles = level.rooms[level.currentRoom[0]][level.currentRoom[1]].tiles;
+	glob_enemy_spawnpoints = [];
 	//loop on tiles to build game scene
 	for (let i = 0;i < tiles.length;i++){
 		let row = tiles[i];
@@ -397,9 +391,15 @@ function setSceneGame(level, starting_door){
 			if (row[j] == 2){//place sliding door
 				let doorModel = new Model();
 				doorModel.name = "door";
-				doorModel.index = doorQuad.index;
-				doorModel.vertex = doorQuad.vertex;
+				doorModel.index = tileQuad.index;
+				doorModel.vertex = tileQuad.vertex;
 				doorModel.compile(scene)
+
+				let doorCoverModel = new Model();
+				doorCoverModel.name = "doorCover";
+				doorCoverModel.index = doorCoverQuad.index;
+				doorCoverModel.vertex = doorCoverQuad.vertex;
+				doorCoverModel.compile(scene);
 
 				let doorname;
 				if (j == 0)
@@ -413,30 +413,35 @@ function setSceneGame(level, starting_door){
 				else
 					console.log("None");
 
-				doorModel.material = doorname == starting_door ? glob_doorclosedMaterial:glob_doorMaterial;
-				let doorNode = scene.addNode(roomStatic, doorModel, doorname, Node.NODE_TYPE.MODEL);
+				let door_fronts = {
+					"door_left": [2*tileSize*((j+1)-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0],
+					"door_right": [2*tileSize*((j-1)-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0],
+					"door_up": [2*tileSize*(j-(row.length/2)), 2*tileSize*((i-1)-(tiles.length/2)), 0],
+					"door_down": [2*tileSize*(j-(row.length/2)), 2*tileSize*((i+1)-(tiles.length/2)), 0]
+				}
 
+				doorCoverModel.material = doorname == starting_door ? glob_doorclosedMaterial:glob_doorMaterial;
+				doorModel.material = glob_tileMaterial;
+				let doorGroup = scene.addNode(roomStatic, null, "door", Node.NODE_TYPE.GROUP);
+				let doorNode = scene.addNode(doorGroup, doorModel, doorname, Node.NODE_TYPE.MODEL);
+				let doorCoveropenclose = scene.addNode(doorGroup, null, "coverT", Node.NODE_TYPE.GROUP);
+				let doorCoverRot = scene.addNode(doorCoveropenclose, null, "coverRot", Node.NODE_TYPE.GROUP);
 				if (j == 0 || j == row.length-1)
-					glob_Mat4x4.makeRotationZ(doorNode.transform, Math.PI/2);
+					glob_Mat4x4.makeRotationZ(doorCoverRot.transform, Math.PI/2);
+				let doorCover = scene.addNode(doorCoverRot, doorCoverModel, "cover", Node.NODE_TYPE.MODEL);
+				doorCover.transform = doorNode.transform;
+				glob_Mat4x4.makeTranslation(doorNode.transform, [2*tileSize*(j-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0]);
 
-				glob_Mat4x4.to(tmp, doorNode.transform);
-				glob_Mat4x4.makeTranslation(trans, [2*tileSize*(j-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0]);
-				glob_Mat4x4.multiply(doorNode.transform, trans, tmp);
 				if (starting_door != undefined && starting_door == doorname){ //set tank position to door
-					if (starting_door == "door_left")
-						glob_Mat4x4.makeTranslation(trans, [2*tileSize*((j+1.1)-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0]);
-					else if (starting_door == "door_right")
-						glob_Mat4x4.makeTranslation(trans, [2*tileSize*((j-1.1)-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0]);
-					else if (starting_door == "door_up")
-						glob_Mat4x4.makeTranslation(trans, [2*tileSize*(j-(row.length/2)), 2*tileSize*((i-1.1)-(tiles.length/2)), 0]);
-					else if (starting_door == "door_down")
-						glob_Mat4x4.makeTranslation(trans, [2*tileSize*(j-(row.length/2)), 2*tileSize*((i+1.1)-(tiles.length/2)), 0]);
+					glob_Mat4x4.makeTranslation(trans, door_fronts[starting_door]);
 					glob_Mat4x4.to(tmp, glob_roverNode.transform);
 					glob_Mat4x4.multiply(glob_roverNode.transform, tmp, original_rotation);
 					glob_Mat4x4.to(tmp, glob_roverNode.transform);
 					glob_Mat4x4.multiply(glob_roverNode.transform, trans, tmp);
 					//TODO also turretRotation.transform
-				}
+				} else glob_enemy_spawnpoints.push(door_fronts[doorname]);
+				
+				console.log(glob_enemy_spawnpoints);
 				continue;
 			}
 			
@@ -456,34 +461,6 @@ function setSceneGame(level, starting_door){
 			}
 			let tileNode = scene.addNode(roomStatic, tileModel, tileModel.name, Node.NODE_TYPE.MODEL);
 			glob_Mat4x4.makeTranslation(tileNode.transform, [2*tileSize*(j-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0]);
-			if (randInt(0,20) == 0 && row[j] == 0){
-				let enemyNode = scene.addNode(mobs, null, {heading: [0,0], lastblock: {w: 0, h: 0}, health: glob_max_mobyellow_health}, Node.NODE_TYPE.GROUP);
-
-				let enemyModel = new Model();
-				enemyModel.index = enemyQuad.index;
-				enemyModel.vertex = enemyQuad.vertex;
-				enemyModel.material = glob_enemyMaterial;
-				enemyModel.compile(scene);
-
-				let enemymodelNode = scene.addNode(enemyNode, enemyModel, "modelnode", Node.NODE_TYPE.MODEL);
-				glob_Mat4x4.makeTranslation(enemymodelNode.transform, [2*tileSize*(j-(row.length/2)), 2*tileSize*(i-(tiles.length/2)), 0]);
-
-				let redScaleNode = scene.addNode(enemyNode, null, "redscale", Node.NODE_TYPE.GROUP);
-				glob_Mat4x4.makeScaling(redScaleNode.transform, [20,2.5,1]);
-
-				let greenScaleNode = scene.addNode(enemyNode, null, "greenscale", Node.NODE_TYPE.GROUP);
-				glob_Mat4x4.makeScaling(greenScaleNode.transform, [20,2.5,0.999]);
-
-				let redTransNode = scene.addNode(redScaleNode, null, "redtrans", Node.NODE_TYPE.GROUP);
-				let greenTransNode = scene.addNode(greenScaleNode, null, "greentrans", Node.NODE_TYPE.GROUP);
-				redTransNode.transform = greenTransNode.transform = enemymodelNode.transform;//important
-
-				let redModelNode = scene.addNode(redTransNode, redBlockModel, "redmodel", Node.NODE_TYPE.MODEL);
-				glob_Mat4x4.makeTranslation(redModelNode.transform, [-tileSize,tileSize*1.2,0]);
-
-				let greenModelNode = scene.addNode(greenTransNode, greenBlockModel, "greenmodel", Node.NODE_TYPE.MODEL);
-				glob_Mat4x4.makeTranslation(greenModelNode.transform, [-tileSize,tileSize*1.2,0]);
-			}
 		}
 	}
 	
@@ -532,6 +509,8 @@ function setSceneGame(level, starting_door){
   glob_Mat4x4.makeIdentity(viewTransform);
 
   scene.setViewFrustum(1, 100, 0.5236);
+
+	glob_wave_over = false;
 	animate = animate_game;
 }
 
@@ -544,12 +523,21 @@ function setSceneDied(){
 
 var animate_game=function() {
 	let elasped = Date.now() - glob_lastFrame;
-	console.log(elasped);
 	if (elasped < 25){
 		window.requestAnimationFrame(animate);
 		return;
 	}
 	glob_lastFrame = Date.now();
+
+	if (currentScene == 1){
+		keyAction();
+		scene.beginFrame();
+		scene.animate();
+		scene.draw();
+		scene.endFrame();
+		window.requestAnimationFrame(animate);
+		return;
+	}
 
 	let trans = glob_Mat4x4.create();
 
@@ -563,36 +551,46 @@ var animate_game=function() {
 
 	let newIpos = world_to_index([posTank[0], posTank[1]]);
 	if (newIpos[0] != glob_roverNode.name.ipos[0] || newIpos[1] != glob_roverNode.name.ipos[1]){
-		glob_roverNode.name.flood = flood(level.rooms[level.currentRoom[0]][level.currentRoom[1]], newIpos, glob_AI_lookahead);
+		glob_roverNode.name.flood = flood(level.rooms[level.currentRoom[0]][level.currentRoom[1]].tiles, newIpos, glob_AI_lookahead);
 		glob_roverNode.name.ipos = newIpos;
 	}
 
 	//iterate on objects in scene
 	staticNode.children.forEach(function(childNode) {
 		let posObj = glob_Vec3.from(0,0,0);
+		
+		let is_starting = false;
+		if (childNode.name == "door"){
+			let doorCover = childNode.children[1];
+			is_starting = doorCover.children[0].children[0].nodeObject.material == glob_doorclosedMaterial;
+			if (glob_wave_over && !is_starting && doorCover.transform[12] <= 3*tileSize)
+				doorCover.transform[12] += 0.02;
+			childNode = childNode.children[0];
+		}
+
 		glob_Mat4x4.multiplyPoint(posObj, childNode.transform, [0,0,0]);
 
 		//calc tank stuff
 		let dist = pythagoras(posTank, posObj);
 		if (dist < glob_radius){
-			if (childNode.name == "wall" || childNode.nodeObject.material == glob_doorclosedMaterial){
+			if (childNode.name == "wall" || is_starting || (childNode.name.startsWith("door_") && !glob_wave_over)){
 				glob_Mat4x4.makeTranslation(trans, [0,-glob_inertia,0]); //move tank back by inertia
 				glob_Mat4x4.to(tmp, glob_roverNode.transform);
 				glob_Mat4x4.multiply(glob_roverNode.transform, tmp, trans);
 				glob_inertia = 0.6*-glob_inertia; //0.6 is wall bounciness
-			} else if (childNode.name.startsWith("door_")){
+			} else if (childNode.name.startsWith("door_")){ //&& wave over
 				if (childNode.name.endsWith("up")){
 					level.currentRoom = [level.currentRoom[0], level.currentRoom[1]+1];
-					setSceneGame(level, "door_down");
+					setSceneGame("door_down");
 				} else if (childNode.name.endsWith("down")){
 					level.currentRoom = [level.currentRoom[0], level.currentRoom[1]-1];
-					setSceneGame(level, "door_up");
+					setSceneGame("door_up");
 				}else if (childNode.name.endsWith("left")){
 					level.currentRoom = [level.currentRoom[0]-1, level.currentRoom[1]];
-					setSceneGame(level, "door_right");
+					setSceneGame("door_right");
 				}else if (childNode.name.endsWith("right")){
 					level.currentRoom = [level.currentRoom[0]+1, level.currentRoom[1]];
-					setSceneGame(level, "door_left");
+					setSceneGame("door_left");
 				}
 				glob_inertia = 0;
 			} else if (childNode.name == "oil") {
@@ -611,7 +609,7 @@ var animate_game=function() {
 				childNode.nodeObject.material = glob_tileMaterial;
 				childNode.name = "tile";
 			} else if (childNode.name == "damage"){
-				glob_tank_projectile_damage += 10;
+				glob_tank_projectile_damage += 4;
 				childNode.nodeObject.material = glob_tileMaterial;
 				childNode.name = "tile";
 			} else if (childNode.name == "bounce"){
@@ -823,12 +821,55 @@ var animate_game=function() {
 		scene.lookAt(observer, [posTank[0],posTank[1],0], [0,1,0]);
 	}
 
+	//spawn enemy in room
+	if (randInt(0,glob_spawnrate) == 0 && level.rooms[level.currentRoom[0]][level.currentRoom[1]].num_enemies){
+		level.rooms[level.currentRoom[0]][level.currentRoom[1]].num_enemies--;
+		let enemyNode = scene.addNode(mobsNode, null, {heading: [0,0], lastblock: {w: 0, h: 0}, health: glob_max_mobyellow_health}, Node.NODE_TYPE.GROUP);
+
+		let redBlockModel = new Model();
+		redBlockModel.index = damageQuad.index;
+		redBlockModel.vertex = damageQuad.vertex;
+		redBlockModel.material = glob_redMaterial;
+		redBlockModel.compile(scene);
+
+		let greenBlockModel = new Model();
+		greenBlockModel.index = damageQuad.index;
+		greenBlockModel.vertex = damageQuad.vertex;
+		greenBlockModel.material = glob_greenMaterial;
+		greenBlockModel.compile(scene);
+
+		let enemyModel = new Model();
+		enemyModel.index = enemyQuad.index;
+		enemyModel.vertex = enemyQuad.vertex;
+		enemyModel.material = glob_enemyMaterial;
+		enemyModel.compile(scene);
+
+		let enemymodelNode = scene.addNode(enemyNode, enemyModel, "modelnode", Node.NODE_TYPE.MODEL);
+		glob_Mat4x4.makeTranslation(enemymodelNode.transform, glob_enemy_spawnpoints[randInt(0,glob_enemy_spawnpoints.length-1)]);
+
+		let redScaleNode = scene.addNode(enemyNode, null, "redscale", Node.NODE_TYPE.GROUP);
+		glob_Mat4x4.makeScaling(redScaleNode.transform, [20,2.5,1]);
+
+		let greenScaleNode = scene.addNode(enemyNode, null, "greenscale", Node.NODE_TYPE.GROUP);
+		glob_Mat4x4.makeScaling(greenScaleNode.transform, [20,2.5,0.999]);
+
+		let redTransNode = scene.addNode(redScaleNode, null, "redtrans", Node.NODE_TYPE.GROUP);
+		let greenTransNode = scene.addNode(greenScaleNode, null, "greentrans", Node.NODE_TYPE.GROUP);
+		redTransNode.transform = greenTransNode.transform = enemymodelNode.transform;//important
+
+		let redModelNode = scene.addNode(redTransNode, redBlockModel, "redmodel", Node.NODE_TYPE.MODEL);
+		glob_Mat4x4.makeTranslation(redModelNode.transform, [-tileSize,tileSize*1.2,0]);
+
+		let greenModelNode = scene.addNode(greenTransNode, greenBlockModel, "greenmodel", Node.NODE_TYPE.MODEL);
+		glob_Mat4x4.makeTranslation(greenModelNode.transform, [-tileSize,tileSize*1.2,0]);
+	}
+
 	scene.beginFrame();
 	scene.animate();
 	scene.draw();
 	scene.endFrame();
 
-	keyAction();//memory leak
+	keyAction();
 	window.requestAnimationFrame(animate);
 };
 
@@ -846,10 +887,13 @@ var animate_roomsview = function() {
 	window.requestAnimationFrame(animate);
 };
 
+//return true if mob died
 function updateMobHealth(mobNode, mobsNode){
 	if (mobNode.name.health <= 0){
 		mobsNode.children.splice(mobsNode.children.indexOf(mobNode), 1);
-		return;
+		if (mobsNode.children.length == 0 && level.rooms[level.currentRoom[0]][level.currentRoom[1]].num_enemies == 0){
+			glob_wave_over = true;
+		}
 	}
 	let scale_green = Math.round(20 * mobNode.name.health / glob_max_mobyellow_health);
 	glob_Mat4x4.makeScaling(mobNode.children[2].transform, [scale_green, 2.5, 0.999]);
@@ -878,12 +922,8 @@ let main=function()
 	try { glob_gl = glob_canvas.getContext("experimental-webgl", {antialias: true}); }
 	catch (e) {alert("No webGL compatibility detected!"); return false;}
 
-	level = genValidLevel();
-	if (currentScene == 0){
-		setSceneGame(level);
-	}else if (currentScene == 1){
-		setSceneRooms(level);
-	}
+	level = genValidLevel(glob_level_difficulty);
+	setSceneGame();
 
 	animate();
 };
