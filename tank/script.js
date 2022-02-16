@@ -218,6 +218,7 @@ function keyAction(){
 					scene.lookAt(observer, [glob_roomsviewoffset + 3*5/2,glob_roomsviewoffset + 3*3/2,0], [0,1,0]);
 				}
 				currentScene = [1,0][currentScene];
+				continue;
 			}
 		}
 		if (currentScene == 2){
@@ -225,6 +226,7 @@ function keyAction(){
 				keyState[keyCode] = false;
 				currentScene = 0;
 				glob_deg--;
+				continue;
 			}
 		}
 		if (currentScene == 0){
@@ -286,7 +288,7 @@ function keyAction(){
 }
 
 function makeScene(starting_door, is_first=false){
-	if (starting_door == undefined && !is_first){
+	if (starting_door == undefined && !is_first && currentScene != 3){
 		console.log(glob_level_difficulty);
 		level = genValidLevel(++glob_level_difficulty);
 
@@ -303,6 +305,7 @@ function makeScene(starting_door, is_first=false){
 		glob_healthTransformNode = undefined;
 		glob_roverNode = undefined;
 	}
+	console.log("ok");
 
   scene = new Scene();
   scene.initialise(glob_gl, glob_canvas);
@@ -446,7 +449,8 @@ function makeScene(starting_door, is_first=false){
 	let turretNode = scene.addNode(glob_turretRotation, turretModel, "turret", Node.NODE_TYPE.MODEL);
 	
 	glob_healthScaleNode = scene.addNode(lightNode, null, "hsn", Node.NODE_TYPE.GROUP);
-	updateTankHealth();
+	if (currentScene != 3) //quick fix
+		updateTankHealth();
 	if (glob_healthTransformNode == undefined){
 		glob_healthTransformNode = scene.addNode(glob_healthScaleNode, null, "htn", Node.NODE_TYPE.GROUP);
 		glob_Mat4x4.makeTranslation(glob_healthTransformNode.transform, [-tileSize,tileSize*1.5,0]);
@@ -1076,6 +1080,7 @@ function updateMobHealth(mobNode, mobsNode){
 function updateTankHealth(){
 	if (glob_roverNode.name.health <= 0){
 		currentScene = 3;
+		makeScene();
 		return;
 	}
 	glob_Mat4x4.makeScaling(glob_healthScaleNode.transform, [20*glob_roverNode.name.health/glob_max_tank_health,2.5,0.95]);
