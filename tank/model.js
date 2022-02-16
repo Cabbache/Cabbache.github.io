@@ -42,5 +42,5 @@ Model.prototype.draw = function(scene, transform)
 
 	this.material.use(scene.gl);
     
-    scene.gl.drawElements(scene.gl.TRIANGLES, this.index.length, scene.gl.UNSIGNED_SHORT, 0);
+	scene.gl.drawElements(scene.gl.TRIANGLES, this.index.length, scene.gl.UNSIGNED_SHORT, 0);
 }

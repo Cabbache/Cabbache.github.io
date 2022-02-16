@@ -69,6 +69,7 @@ function convertTextures(textureList) {
     let img = document.createElement("img");
     let imgContainer = document.getElementById("imageCollection");
     img.src = textureList[`${e}`];
+		img.style.position = 'absolute'; //having a lot of images causes them to make the window scroll
     imgContainer.appendChild(img);
 
     textureList[`${e}`] = img;
@@ -79,12 +80,17 @@ function pythagoras(p1, p2){
 	return Math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2);
 }
 
-function make_material(gl, shader, texture){
+//both inclusive
+function randInt(min, max){
+	return Math.floor(min+Math.floor(Math.random() * (max+1-min)));
+}
+
+function make_material(gl, shader, texture, ambient=1){
 	let material = new Material();
   material.setAlbedo(gl, texture);
   material.setShininess(96.0);
   material.setSpecular([1,1,1]);
-  material.setAmbient([1,1,1]);
+  material.setAmbient([ambient,ambient,ambient]);
   material.setDiffuse([1,1,1]);
   material.bind(gl, shader);
 	return material;

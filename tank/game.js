@@ -2,11 +2,6 @@ const width = 42;
 const height = 22;
 const glob_headings = [[-1,0], [1,0], [0,-1], [0,1]];
 
-//both inclusive
-function randInt(min, max){
-	return Math.floor(min+Math.floor(Math.random() * (max+1-min)));
-}
-
 function isEnabled(level, room){
 	return getDoors(level, room) != 0;
 }
@@ -57,6 +52,24 @@ function getNeighbours(level, room){
 	return neighbours.map(x => [x[0]+room[0], x[1]+room[1]]);
 }
 
+//is the shortest path from start to end of required_depth jumps from room to room
+function isTherePath(level, required_depth, current_depth=0){
+	let neighbours = getNeighbours(level, level.start);
+	//base cases
+	if (level.start[0] == level.end[0] && level.start[1] == level.end[1] && required_depth == current_depth)
+		return true;
+
+	if (neighbours.length == 0)
+		return false;
+	
+	for (let i = 0;i < neighbours.length;i++){
+		if (!isTherePath(step(level, neighbours[i]), required_depth, current_depth+1))
+			return false;
+	}
+	
+	return true;
+}
+
 function genValidLevel(difficulty=1){
 	function genLevel(){
 		let start = [0,0];
@@ -75,25 +88,8 @@ function genValidLevel(difficulty=1){
 		};
 	}
 
-	function isValid(level, required_depth, current_depth=0){
-		let neighbours = getNeighbours(level, level.start);
-		//base cases
-		if (level.start[0] == level.end[0] && level.start[1] == level.end[1] && required_depth == current_depth)
-			return true;
-
-		if (neighbours.length == 0)
-			return false;
-		
-		for (let i = 0;i < neighbours.length;i++){
-			if (!isValid(step(level, neighbours[i]), required_depth, current_depth+1))
-				return false;
-		}
-		
-		return true;
-	}
-
 	let level;
-	while (!isValid(level = genLevel(), Math.min(2+randInt(difficulty, difficulty+3), 14)));
+	while (!isTherePath(level = genLevel(), Math.min(2+randInt(difficulty,difficulty+1), 14)));
 
 	for (let i = 0;i < 4;i++)
 	for (let j = 0;j < 4;j++)
@@ -101,6 +97,8 @@ function genValidLevel(difficulty=1){
 	
 	return level;
 }
+
+//from here onwards the functions handle the contents of the room rather the structure of the level
 
 //returns length of shortest path, doors and tiles are not obstacles
 //idea from https://www.geeksforgeeks.org/shortest-path-in-a-binary-maze/
@@ -147,6 +145,7 @@ function shortestLength(tiles, p1, p2){
 	return -1;
 }
 
+//returns distance (but not in straight line) field for point p1
 function flood(tiles, p1, maxdist=5){
 	let visited = (new Array(tiles.length)).fill(0).map(x => new Array(tiles[0].length).fill(0));
 	visited[p1[0]][p1[1]] = 1;
@@ -191,8 +190,8 @@ function perc_covered(tiles){
 	return cnt_covered / (tiles.length * tiles[0].length);
 }
 
-//returns true if for every door, there is a path to every other door, returns false otherwise.
-function allDoorsHavePath(tiles){
+//returns positions of all doors in room
+function getRoomDoors(tiles){
 	let doors = [];
 	for (let i = 0;i < tiles.length;i++){
 		for (let j = 0;j < tiles[i].length;j++){
@@ -200,6 +199,12 @@ function allDoorsHavePath(tiles){
 				doors.push([i,j]);
 		}
 	}
+	return doors;
+}
+
+//returns true if for every door, there is a path to every other door, returns false otherwise.
+function allDoorsHavePath(tiles){
+	let doors = getRoomDoors(tiles);
 
 	if (doors.length == 0)
 		return true;
@@ -227,6 +232,13 @@ function allDoorsHavePath(tiles){
 function buildRoom(level, room, difficulty=1){
 	let doors = getDoors(level, room);
 	let tiles = [];
+
+	if (doors == 0){//dont bother generating room without doors
+		return {
+			tiles: [],
+			num_enemies: 0
+		}
+	}
 	/*
 		tiles[+][]
 		 ^
@@ -297,8 +309,24 @@ left[1,0,0,0,0,1] H right
 				tiles[pos[0]][pos[1]] = 1;
 		}
 
+		//fill hollow unrechable places with wall. This is probably inefficient
+		let doorpos = getRoomDoors(tiles);
+		for (let i = 0;i < tiles.length;i++){
+			for (let j = 0;j < tiles[0].length;j++){
+				if (tiles[i][j] == 0 && shortestLength(tiles, [i,j], doorpos[0]) == -1){
+					let cover = flood(tiles, [i,j], 20);
+					for (let a = 0;a < cover.length;a++){
+						for (let b = 0;b < cover[0].length;b++){
+							if (cover[a][b])
+								tiles[a][b] = 1;
+						}
+					}
+				}
+			}
+		}
+
 		//place traps at corners
-		for (let i=0;i<200+(difficulty*5);i++){
+		for (let i=0;i<200+(difficulty*8);i++){
 			let h1 = randInt(1,height-2);
 			let w1 = randInt(1,width-2);
 			if (tiles[h1][w1]) continue; //skip occupied
@@ -318,7 +346,7 @@ left[1,0,0,0,0,1] H right
 		}
 
 		//place traps and powerups on random tiles, not necesarily in corners
-		for (let i = 0;i < 30+(difficulty*2);i++){
+		for (let i = 0;i < 30+(difficulty*3);i++){
 			let h1 = randInt(1,height-2);
 			let w1 = randInt(1,width-2);
 			if (tiles[h1][w1]) continue;

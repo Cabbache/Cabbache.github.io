@@ -52,7 +52,7 @@ Node.prototype.draw = function(scene, parentTransform)
 		{
 			// Transform light before setting it
 			if (_nodeObject) {
-				_nodeObject.useTransformed(scene.gl, compositeTransform);
+				//_nodeObject.useTransformed(scene.gl, compositeTransform);
 			}
 		}
 
@@ -128,7 +128,7 @@ Scene.prototype.loadShader = function(shaderName, shaderType, shaderTypeString)
 //--------------------------------------------------------------------------------------------------------//
 //  Scene Initialisation
 //--------------------------------------------------------------------------------------------------------//
-Scene.prototype.initialiseShaders = function ()
+Scene.prototype.initialiseShaders = function (lightIndex)
 {
 	// Load vertex and fragment shaders
 	this.shaderVertex = this.loadShader("vertex-shader", this.gl.VERTEX_SHADER, "VERTEX");

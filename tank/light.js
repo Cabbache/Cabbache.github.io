@@ -16,9 +16,10 @@ function Light()
 	this.beta = 0.82;
 	
 	this.attenuation = 0; // No attenuation
+	this.lightIndex = 0;
 
 	this.shaderIndices = {
-		bound : false, typeVertex : 0, typeFragment : 0, position : 0, direction : 0,
+		lightIndex: 0, bound : false, typeVertex : 0, typeFragment : 0, position : 0, direction : 0,
 		ambient : 0, diffuse : 0, specular : 0,
 		alpha : 0, beta : 0, attenuation : 0		
 	}
@@ -73,8 +74,10 @@ Light.prototype.bind = function(gl, shaderProgram, lightIndex)
 {
 	var lightVertexPrefix = "LightVertex[" + lightIndex + "].";
 	var lightFragmentPrefix = "LightFragment[" + lightIndex + "].";
+	this.lightIndex = lightIndex;
 
 	this.shaderIndices.bound = true;
+	this.shaderIndices.lightIndex = gl.getUniformLocation(shaderProgram, "lightIndex");
 	this.shaderIndices.typeVertex = gl.getUniformLocation(shaderProgram, lightVertexPrefix + "type"); 
 	this.shaderIndices.position = gl.getUniformLocation(shaderProgram, lightVertexPrefix + "position");
 	this.shaderIndices.direction = gl.getUniformLocation(shaderProgram, lightVertexPrefix + "direction");
@@ -100,6 +103,8 @@ Light.prototype.useTransformed = function(gl, transform)
 	matrixHelper.matrix4.multiplyVector(d, transform, this.direction);
 	matrixHelper.matrix4.multiplyPoint(p, transform, this.position);
 
+	//gl.uniform1i(this.shaderIndices.lightIndex, this.lightIndex);
+	gl.uniform1i(this.shaderIndices.lightIndex, this.lightIndex);
 	gl.uniform1i(this.shaderIndices.typeVertex, this.type);
 	gl.uniform1i(this.shaderIndices.typeFragment, this.type);
 	gl.uniform1i(this.shaderIndices.attenuation, this.attenuation);
@@ -119,6 +124,7 @@ Light.prototype.use = function(gl)
 		return;
 	}
 
+	gl.uniform1i(this.shaderIndices.lightIndex, this.lightIndex);
 	gl.uniform1i(this.shaderIndices.typeVertex, this.type);
 	gl.uniform1i(this.shaderIndices.typeFragment, this.type);
 	gl.uniform1i(this.shaderIndices.attenuation, this.attenuation);
