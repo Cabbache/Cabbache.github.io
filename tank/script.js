@@ -811,7 +811,7 @@ var animate_game=function() {
 		projectilesNode.children.forEach(function(projNode){
 			let posProj = glob_Vec3.from(0,0,0);
 			glob_Mat4x4.multiplyPoint(posProj, projNode.transform, [0,0,0]);
-			if (["tile","oil","concurrent","damage","bounce"].indexOf(childNode.name) == -1 && pythagoras(posProj, posObj) < glob_radius){
+			if (["tile","oil"].indexOf(childNode.name) == -1 && pythagoras(posProj, posObj) < glob_radius){
 				if (projNode.name.bounces < glob_projectile_bounce_count && projNode.nodeObject.name != "badprojectile"){
 					projNode.name.bounces++
 					glob_Mat4x4.to(tmp, projNode.transform);
@@ -1089,7 +1089,7 @@ let main=function()
 {
 	glob_canvas = document.getElementById("canvas-cg-lab");
 	glob_canvas.width = window.innerWidth;
-	glob_canvas.height = window.innerHeight;
+	glob_canvas.height = window.innerHeight > window.innerWidth ? window.innerWidth:window.innerHeight;
 	glob_canvas.aspect = glob_canvas.width / glob_canvas.height;
 
 	// Assign context to gl
