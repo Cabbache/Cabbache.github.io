@@ -39,8 +39,8 @@ var glob_spawnrate = 30;
 
 const glob_turret_rotation_speed = 8;
 const glob_maxinertia = 0.12;
-const glob_acceleration = 0.005;
-const glob_moveThresh = 0.006;
+const glob_acceleration = 0.01;
+const glob_moveThresh = glob_acceleration;
 const glob_radius = 0.5;
 const glob_healthbar_res = 20;//number of blocks that indicate health
 const tileSize = 0.3;
