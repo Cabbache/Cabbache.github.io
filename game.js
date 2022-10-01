@@ -1,185 +1,364 @@
-var food;
-var foodImage;
-var playerImage;
-var backgroundImage;
-var playerThrImg;
-var rot = 0;
-var thrust = 0.1;
-var thrustRot = 0.2;
-var velx = 0;
-var vely = 0;
-var planetImgs = [];
-var planets = [];
-var difficulty = 0;
-var planetcount = 0;
-var ammoImage;
-var ammo;
-var ammoSpeed = 20;
-var ammovelx = 0;
-var ammovely = 0;
-var hit = false;
+const width = 42;
+const height = 22;
+const glob_headings = [[-1,0], [1,0], [0,-1], [0,1]];
 
-function preload() {
-  planetImgs = [loadImage("p1.png"), loadImage("p2.png"), loadImage("p3.png"), loadImage("p4.png"), loadImage("p5.png")];
-  playerImage = loadImage("nyan.png");
-  backgroundImage = loadImage("back.jpeg");
-  playerThrImg = loadImage("go.png");
-  foodImage = loadImage("food.png");
-  ammoImage = loadImage("ammo.png");
+function isEnabled(level, room){
+	return getDoors(level, room) != 0;
 }
 
-function setup() {
-  createCanvas(screen.width - 30, screen.height - 30);
-  player = createSprite(width/2, height/2, 0, 0);
-  food = createSprite(-foodImage.width,-foodImage.height,0,0);
-  food.addImage(foodImage);
-  ammo = createSprite(-ammoImage.width,-ammoImage.height,0,0);
-  ammo.addImage(ammoImage);
-  food.rotationSpeed = 1;
-  food.position.x = (Math.random()*(width - foodImage.width))+foodImage.width;
-  food.position.y = (Math.random()*(height - foodImage.height))+foodImage.height;
+//e.g getDoors(genLevel(), [2,1]) //[0,0] is bottom left [3,3] is top right
+/*
+	91011
+	6 7 8
+	3 4 5
+	0 1 2
+
+	14 17 20 23
+	13 16 19 22
+	12 15 18 21
+*/
+function getDoors(level, room){
+	return (room[1] && level.connections >> 12 + room[0]*3 + room[1] - 1 & 1) << 3 | //DOWN
+	(room[1] != 3 && level.connections >> 12 + room[0]*3 + room[1] & 1) << 2 | //UP
+	(room[0] && level.connections >> room[1]*3 + room[0] - 1 & 1) << 1 | //LEFT
+	(room[0] != 3 && level.connections >> room[1]*3 + room[0] & 1); //RIGHT
 }
 
-function draw() {
-	if (hit && keyDown(13)){
-		window.location.reload();
+//https://stackoverflow.com/questions/24506555/how-to-find-the-number-of-1s-in-a-binary-representation-of-a-number
+function num_doors(level){
+	return level.connections.toString(2).split('1').length-1;
+}
+
+//room must be a neighbour of level.start
+//assumes player is at level.start
+function step(level, room){
+	let copy = {...level};
+	if (copy.start[1]) copy.connections &= ~(1 << (12 + copy.start[0]*3 + copy.start[1] - 1 + 1) - 1);
+	if (copy.start[1] != 3) copy.connections &= ~(1 << (12 + copy.start[0]*3 + copy.start[1] + 1) - 1);
+	if (copy.start[0]) copy.connections &= ~(1 << (copy.start[1]*3 + copy.start[0] - 1 + 1) - 1);
+	if (copy.start[0] != 3) copy.connections &= ~(1 << (copy.start[1]*3 + copy.start[0] + 1) - 1);
+	copy.start = room;
+	return copy;
+}
+
+//get neighbouring rooms of room
+function getNeighbours(level, room){
+	let doors = getDoors(level, room);
+	let neighbours = [];
+	if (doors >> 0 & 1) neighbours.push([1,0]); //RIGHT
+	if (doors >> 1 & 1) neighbours.push([-1,0]); //LEFT
+	if (doors >> 2 & 1) neighbours.push([0,1]); //UP
+	if (doors >> 3 & 1) neighbours.push([0,-1]); //DOWN
+	return neighbours.map(x => [x[0]+room[0], x[1]+room[1]]);
+}
+
+//is the shortest path from start to end of required_depth jumps from room to room
+function isTherePath(level, required_depth, current_depth=0){
+	let neighbours = getNeighbours(level, level.start);
+	//base cases
+	if (level.start[0] == level.end[0] && level.start[1] == level.end[1] && required_depth == current_depth)
+		return true;
+
+	if (neighbours.length == 0)
+		return false;
+	
+	for (let i = 0;i < neighbours.length;i++){
+		if (!isTherePath(step(level, neighbours[i]), required_depth, current_depth+1))
+			return false;
 	}
-	else if (hit){
-		end();
+	
+	return true;
+}
+
+function genValidLevel(difficulty=1){
+	function genLevel(){
+		let start = [0,0];
+		let end = [0,0];
+		while (start[0] == end[0] && start[1] == end[1]){
+			start = [randInt(0, 3), randInt(0,3)];
+			end = [randInt(0,3), randInt(0,3)];
+		}
+
+		return {
+			start: start,
+			end: end,
+			currentRoom: start,
+			connections: randInt(0, 1<<24), //level can have 24 doors max: 2^24 possible levels
+			rooms: {0:{},1:{},2:{},3:{}}
+		};
 	}
-	else{
-    	background(backgroundImage);
-    	drawSprites();
-		motion();
-		rot = player.rotation % 360;
-		if ((ammovelx != 0 || ammovely != 0) && (ammo.position.x < 0 || ammo.position.x > width || ammo.position.y < 0 || ammo.position.y > height)){
-			ammovelx = 0;
-			ammovely = 0;
+
+	let level;
+	while (!isTherePath(level = genLevel(), Math.min(2+randInt(difficulty,difficulty+1), 14)));
+
+	for (let i = 0;i < 4;i++)
+	for (let j = 0;j < 4;j++)
+		level.rooms[i][j] = buildRoom(level, [i, j]);
+	
+	return level;
+}
+
+//from here onwards the functions handle the contents of the room rather the structure of the level
+
+//returns length of shortest path, doors and tiles are not obstacles
+//idea from https://www.geeksforgeeks.org/shortest-path-in-a-binary-maze/
+function shortestLength(tiles, p1, p2){
+	let visited = (new Array(tiles.length)).fill(0).map(x => new Array(tiles[0].length).fill(0));
+	visited[p1[0]][p1[1]] = 1;
+	let start = {
+		h: p1[0],
+		w: p1[1],
+		dist: 0
+	};
+	let queue = [start];
+	while (queue.length != 0){
+		//debug
+		//let str = "";
+		//for (let a = 0;a < visited.length;a++){
+		//	for (let b = 0;b < visited[0].length;b++){
+		//		str += ","+visited[a][b];
+		//	}
+		//	str += "\n";
+		//}
+		//console.log(str);
+		let pt = queue[0];
+		if (pt.h == p2[0] && pt.w == p2[1])
+			return pt.dist;
+
+		queue.shift();
+		glob_headings.forEach(
+			function (x){
+				let newpt = {
+					h: pt.h + x[0],
+					w: pt.w + x[1]
+				};
+				if (newpt.h < 0 || newpt.h >= visited.length || newpt.w < 0 || newpt.w >= visited[0].length)
+					return;
+				if (visited[newpt.h][newpt.w] || (tiles[newpt.h][newpt.w] && tiles[newpt.h][newpt.w] != 2))
+					return;
+				visited[newpt.h][newpt.w] = 1;
+				newpt.dist = pt.dist+1;
+				queue.push(newpt);
+			}
+		);
+	}
+	return -1;
+}
+
+//returns distance (but not in straight line) field for point p1
+function flood(tiles, p1, maxdist=5){
+	let visited = (new Array(tiles.length)).fill(0).map(x => new Array(tiles[0].length).fill(0));
+	visited[p1[0]][p1[1]] = 1;
+	let start = {
+		h: p1[0],
+		w: p1[1],
+		dist: 1
+	};
+	let queue = [start];
+	while (queue.length != 0){
+		let pt = queue[0];
+		queue.shift();
+		if (pt.dist >= maxdist)
+			continue;
+
+		glob_headings.forEach(
+			function (x){
+				let newpt = {
+					h: pt.h + x[0],
+					w: pt.w + x[1]
+				};
+				if (newpt.h < 0 || newpt.h >= visited.length || newpt.w < 0 || newpt.w >= visited[0].length)
+					return;
+				if (visited[newpt.h][newpt.w] || (tiles[newpt.h][newpt.w] && tiles[newpt.h][newpt.w] <= 4))
+					return;
+				visited[newpt.h][newpt.w] = pt.dist+1;
+				newpt.dist = pt.dist+1;
+				queue.push(newpt);
+			}
+		);
+	}
+	return visited;
+}
+
+function perc_covered(tiles){
+	let cnt_covered = tiles.map(
+		x => x.filter(tile => tile == 1).length
+	).reduce(
+		function(acc, a){return acc+a;},
+		0
+	);
+	return cnt_covered / (tiles.length * tiles[0].length);
+}
+
+//returns positions of all doors in room
+function getRoomDoors(tiles){
+	let doors = [];
+	for (let i = 0;i < tiles.length;i++){
+		for (let j = 0;j < tiles[i].length;j++){
+			if (tiles[i][j] == 2)
+				doors.push([i,j]);
 		}
-		if (planetcount < Math.floor(difficulty/3.0) || (planetcount < 1 && difficulty != 0)){
-			summonPlanet();	
-		}
-		planetcount = 0;
-		for (k = 0;k < planets.length;k++){
-			var px = planets[k][0].position.x;
-			var py = planets[k][0].position.y;
-			if (px > -1*(planetImgs[planets[k][2]].width)){
-				planetcount += 1;
-				planets[k][0].position.x += planets[k][1];
-				var radius = planetImgs[planets[k][2]].width/2;
-				var distance = calcDistance(player.position.x, px, player.position.y, py);
-				if (distance < radius){
-					hit = true;
-				}
-				var distAmmo = calcDistance(ammo.position.x, px, ammo.position.y, py);
-				if (distAmmo < radius && (ammovelx != 0 || ammovely != 0)){
-					planets[k][0].position.x = -1*(planetImgs[planets[k][2]].width) + 10;
-				}
-				var vect = Weight(radius, player.position.x, player.position.y, px, py);
-				vely += vect[0];
-				velx += vect[1];
+	}
+	return doors;
+}
+
+//returns true if for every door, there is a path to every other door, returns false otherwise.
+function allDoorsHavePath(tiles){
+	let doors = getRoomDoors(tiles);
+
+	if (doors.length == 0)
+		return true;
+	else if (doors.length == 1)
+		doors.push([tiles.length/2, tiles[0].length/2]);
+
+	for (let i = 0;i < doors.length-1;i++){
+		for (let j = i+1;j < doors.length;j++){
+			if (shortestLength(tiles, [doors[i][0], doors[i][1]],[doors[j][0],doors[j][1]]) == -1){
+				return false;
 			}
 		}
-		if (player.overlap(food)){
-			difficulty += 1;
-			thrust += 0.01;
-			changeFoodLoc();
-		}
-		if (ammo.overlap(food)){
-			changeFoodLoc();
-		}
-		if (rot > 0){
-			rot = 360-rot;
-		}
-		else{
-			rot = Math.abs(rot);
-		}
-		if (keyDown(RIGHT_ARROW)){
-			player.rotationSpeed += thrustRot;
-		}
-		if (keyDown(LEFT_ARROW)){
-			player.rotationSpeed -= thrustRot;
-		}
-		if (keyDown(UP_ARROW)){
-			vely += -1*thrust*Math.sin((Math.PI*rot)/180.0);
-			velx += thrust*Math.cos((Math.PI*rot)/180.0);
-			player.addImage(playerThrImg);
-		}
-		else
-		{
-			player.addImage(playerImage);
-		}
-		if (keyDown(32) && (ammovelx == 0 && ammovely == 0)){
-			ammo.rotation = player.rotation;
-			ammo.position.x = player.position.x;
-			ammo.position.y = player.position.y;
-			ammovelx = ammoSpeed*Math.cos((Math.PI*rot)/180.0) + velx;
-			ammovely = -ammoSpeed*Math.sin((Math.PI*rot)/180.0) + vely;
-		}
-		if (velx + player.position.x + playerImage.width/2 > width || player.position.x - playerImage.width/2 < 0){
-			velx *= -1;
-		}
-		if (vely + player.position.y + playerImage.height/2 > height || player.position.y-playerImage.height/2 < 0){
-			vely *= -1;
+	}
+
+	return true;
+}
+
+/*
+	0 - free space
+	1 - wall
+	2 - door
+	3 - tnt
+	4 - oil
+*/
+function buildRoom(level, room, difficulty=1){
+	let doors = getDoors(level, room);
+	let tiles = [];
+
+	if (doors == 0){//dont bother generating room without doors
+		return {
+			tiles: [],
+			num_enemies: 0
 		}
 	}
-}
+	/*
+		tiles[+][]
+		 ^
+		 |   up
+		[1,1,1,1,1,1] |
+left[1,0,0,0,0,1] H right
+		[1,1,1,1,1,1] -> tiles[][+]
+		    --W--
+				down
+	*/
 
-function motion() {
-	player.position.x += velx;
-	player.position.y += vely;
-	ammo.position.x += ammovelx;
-	ammo.position.y += ammovely;
-}
+	while (tiles.length == 0 || !allDoorsHavePath(tiles)){
+		tiles = [];
+		//make empty room with surrounding walls
+		for (let i = 0;i < height;i++){
+			let row = [];
+			for (let j = 0;j < width;j++){
+				if (i == 0 || i == height-1 || j == 0 || j == width-1)
+					row.push(1);
+				else
+					row.push(0);
+			}
+			tiles.push(row);
+		}
 
-function summonPlanet() {
-	var indx = Math.floor(Math.random()*planetImgs.length);
-	var img = planetImgs[indx];
-	planets[planets.length] = [createSprite(width + img.width/2, Math.random()*height, 0, 0),-1 + (Math.random()*-3), indx];
-	planets[planets.length-1][0].addImage(img);
-	planets[planets.length-1][0].rotationSpeed = (Math.random()*2)-1;
-}
+		//make door tiles
+		if (doors >> 3 & 1) { //if theres a down door
+			let door_pos = randInt(width*0.1, width*0.9);
+			if (level.rooms[room[0]][room[1]-1] != undefined)
+				door_pos = level.rooms[room[0]][room[1]-1].tiles[height-1].indexOf(2); //to make door in same place as connecting room
+			tiles[0][door_pos] = 2;
+		} if (doors >> 2 & 1) { //if theres an up door
+			let door_pos = randInt(width*0.1, width*0.9);
+			if (level.rooms[room[0]][room[1]+1] != undefined)
+				door_pos = level.rooms[room[0]][room[1]+1].tiles[0].indexOf(2);
+			tiles[height-1][door_pos] = 2;
+		} if (doors >> 1 & 1) { //if theres a left door
+			let door_pos = randInt(height*0.1, height*0.9);
+			if (level.rooms[room[0]-1][room[1]] != undefined)
+				door_pos = level.rooms[room[0]-1][room[1]].tiles.map(row => row[row.length-1]).indexOf(2);
+			tiles[door_pos][0] = 2;
+		} if (doors >> 0 & 1) { //if theres a right door
+			let door_pos = randInt(height*0.1, height*0.9);
+			if (level.rooms[room[0]+1][room[1]] != undefined)
+				door_pos = level.rooms[room[0]+1][room[1]].tiles.map(row => row[0]).indexOf(2);
+			tiles[door_pos][width-1] = 2;
+		}
 
-function calcDistance(x1, x2, y1, y2){
-	return Math.sqrt(Math.pow(x1-x2, 2) + Math.pow(y1-y2, 2));
-}
+		//place a few blocks randomly
+		for (let i = 0;i < 20;i++){
+			let h1 = randInt(1,height-2);
+			let w1 = randInt(1,width-2);
+			tiles[h1][w1] = 1;
+		}
 
-function changeFoodLoc() {
-	var x = (Math.random()*(width - foodImage.width))+foodImage.width;
-	var y = (Math.random()*(height - foodImage.height))+foodImage.height;
-	do{
-		 x = (Math.random()*(width - foodImage.width))+foodImage.width;
-		 y = (Math.random()*(height - foodImage.height))+foodImage.height;	
+		//grow the blocks placed randomly
+		while (perc_covered(tiles) < 0.4){
+			let i = randInt(2,height-3);
+			let j = randInt(2,width-3);
+			if (tiles[i][j] == 0) continue;
+			let direction = [[0,1],[0,-1],[1,0],[-1,0]][randInt(0,3)];
+			let pos = [i,j];
+			while (tiles[pos[0]] && tiles[pos[0]][pos[1]]){
+				pos[0] += direction[0];
+				pos[1] += direction[1];
+			}
+			if (tiles[pos[0]] && tiles[pos[0]][pos[1]] != undefined)
+				tiles[pos[0]][pos[1]] = 1;
+		}
+
+		//fill hollow unrechable places with wall. This is probably inefficient
+		let doorpos = getRoomDoors(tiles);
+		for (let i = 0;i < tiles.length;i++){
+			for (let j = 0;j < tiles[0].length;j++){
+				if (tiles[i][j] == 0 && shortestLength(tiles, [i,j], doorpos[0]) == -1){
+					let cover = flood(tiles, [i,j], 20);
+					for (let a = 0;a < cover.length;a++){
+						for (let b = 0;b < cover[0].length;b++){
+							if (cover[a][b])
+								tiles[a][b] = 1;
+						}
+					}
+				}
+			}
+		}
+
+		//place traps at corners
+		for (let i=0;i<200+(difficulty*8);i++){
+			let h1 = randInt(1,height-2);
+			let w1 = randInt(1,width-2);
+			if (tiles[h1][w1]) continue; //skip occupied
+			if (//if walls touch at vertices
+				tiles[h1+1][w1+0] && tiles[h1+0][w1+1] ||
+				tiles[h1+0][w1+1] && tiles[h1-1][w1+0] ||
+				tiles[h1-1][w1+0] && tiles[h1+0][w1-1] ||
+				tiles[h1+0][w1-1] && tiles[h1+1][w1+0]
+			){
+				tiles[h1][w1] = 3;
+			} else if ( //if walls cross
+				tiles[h1+1][w1+0] && tiles[h1-1][w1+0] ||
+				tiles[h1+0][w1+1] && tiles[h1+0][w1-1]
+			) {
+				tiles[h1][w1] = 4;//4
+			}
+		}
+
+		//place traps and powerups on random tiles, not necesarily in corners
+		for (let i = 0;i < 30+(difficulty*3);i++){
+			let h1 = randInt(1,height-2);
+			let w1 = randInt(1,width-2);
+			if (tiles[h1][w1]) continue;
+			if (randInt(0,30+(difficulty*2)) == 0)
+				tiles[h1][w1] = randInt(5,7);//powerups
+			else
+				tiles[h1][w1] = randInt(3,4);//traps
+		}
 	}
-	while (y < player.position.y + playerImage.height && y > player.position.y - playerImage.height && x < player.position.x + playerImage.width && x > player.position.x - playerImage.width);
-	food.position.x = x;
-	food.position.y = y;
-}
 
-function Weight(massRadius, plx, ply, px, py) {
-	var distance = calcDistance(plx, px, ply, py);
-	var mass = Math.PI*Math.pow(massRadius,2);
-	var consG = 2500;
-	var pull = mass/(consG*distance);
-	var angle = Math.atan((ply - py)/(plx - px));
-	var dir = 1;
-	if (player.position.x > px){
-		dir = -1;
-	}
-	var vector = [pull*Math.sin(angle)*dir, pull*Math.cos(angle)*dir];
-	return vector;
-}
-
-function end() {
-	background(255,127,0);
-	textAlign(CENTER);
-	textSize(20);
-	fill("black");
-	text("Nyan cat got hurt.", width/2, height/2);
-	textSize(30);
-	text("Your score is " + difficulty, width/2, height/2 + 50);
-	textSize(50);
-	text("Hit enter to restart", width/2, height/2 + 100);
-	textSize(20);
-	text("How to play\nLeft arrow: turn counter-clockwise\nRight arrow: turn clockwise\nUp arrow: move\nSpace: shoot", width/2, height/2 + 150);
+	return {
+		tiles: tiles,
+		num_enemies: randInt(difficulty, difficulty+2)*5
+	};
 }
